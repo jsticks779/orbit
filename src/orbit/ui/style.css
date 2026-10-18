@@ -3,12 +3,12 @@
 @define-color accent_color #0A84FF;
 @define-color accent_fg_color #ffffff;
 
-/* The card window's corners are see-through; the card is drawn with cairo. */
-window.orbit-overlay,
-window.orbit-overlay > * {
-  background: transparent;
-  box-shadow: none;
+/* The card is a normal borderless window: GNOME rounds it and adds the shadow. */
+window.orbit-card {
+  background-color: @window_bg_color;
+  border-radius: 24px;
 }
+window.orbit-card > * { background: transparent; }
 
 window.orbit-editor { border-radius: 12px; }
 window.orbit-editor headerbar { background: transparent; box-shadow: none; }

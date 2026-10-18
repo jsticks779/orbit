@@ -33,12 +33,11 @@ from .thumbs import thumbnail  # noqa: E402
 
 log = logging.getLogger("orbit")
 
-W, H = 440, 556          # window size
-M = 22                   # transparent margin for the card shadow
-RADIUS = 30              # card corner radius
-CX, CY = W / 2, 268      # orbit centre
+W, H = 396, 512          # the window is the card
+M = 0                    # no margin: GNOME draws the rounded corners and shadow
+CX, CY = W / 2, 246      # orbit centre
 ORBIT = 138              # orbit radius (button centres)
-SEG_Y = 58               # segmented control centre
+SEG_Y = 36               # segmented control centre
 PAGE_NAMES = ["Convert", "Tools"]
 
 # One solid accent (Apple system blue) and Apple-style neutrals. No gradients.
@@ -86,10 +85,13 @@ def _rounded(cr, x, y, w, h, r):
 class RingWindow(Gtk.Window):
     def __init__(self, app, files: list[Path] | None = None, progress_only=False):
         # A compact card-sized window. The title lets the GNOME Shell extension find it.
-        super().__init__(application=app, decorated=False, resizable=False, title="Orbit Panel",
+        super().__init__(application=app, resizable=False, title="Orbit Panel",
                          default_width=W, default_height=H)
+        # An empty titlebar gives a borderless window that still gets GNOME's native
+        # rounded corners and shadow, so there's no dark layer behind the card.
+        self.set_titlebar(Gtk.Box(visible=False))
         self.app = app
-        self.add_css_class("orbit-overlay")
+        self.add_css_class("orbit-card")
         self.files: list[Path] = []
         self.click_mode = bool(files)
         self.pages: list[list[Action]] = []
@@ -412,22 +414,6 @@ class RingWindow(Gtk.Window):
         t = self.theme
         a = _ease(self.appear) * max(0.0, self.fade)
         cr.push_group()
-        s = 0.94 + 0.06 * _ease(self.appear)
-        cr.translate(W / 2, H / 2)
-        cr.scale(s, s)
-        cr.translate(-W / 2, -H / 2)
-
-        # Card with layered soft shadow (macOS style).
-        for i, (grow, alpha) in enumerate(((14, 0.25), (8, 0.35), (3, 0.4))):
-            _rounded(cr, M - grow / 2, M + grow / 3, W - 2 * M + grow, H - 2 * M + grow / 2, RADIUS + grow / 2)
-            cr.set_source_rgba(0, 0, 0, t["shadow"] * alpha * 0.35)
-            cr.fill()
-        _rounded(cr, M, M, W - 2 * M, H - 2 * M, RADIUS)
-        cr.set_source_rgba(*t["card"])
-        cr.fill_preserve()
-        cr.set_source_rgba(*t["edge"])
-        cr.set_line_width(1)
-        cr.stroke()
 
         self._close_dot(cr)
         menu_alpha = 1 - _ease(self.morph)
