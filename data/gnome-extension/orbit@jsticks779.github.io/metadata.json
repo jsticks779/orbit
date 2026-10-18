@@ -1,0 +1,7 @@
+{
+  "uuid": "orbit@jsticks779.github.io",
+  "name": "Orbit helper",
+  "description": "Opens the Orbit card under the pointer and keeps it on top. Needed because Wayland apps can't position their own windows.",
+  "shell-version": ["45", "46", "47", "48", "49"],
+  "url": "https://github.com/jsticks779/orbit"
+}

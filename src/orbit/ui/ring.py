@@ -1,12 +1,13 @@
-"""The Orbit panel: a compact floating glass card with a circle of actions.
+"""The Orbit panel: a compact floating card with a circle of actions.
 
 macOS / iOS inspired: a light or dark material card, an iOS segmented control
 (Convert / Tools), round buttons on an orbit, a live file preview in the middle
 and a one-line explanation at the bottom. After a choice the same card shows
-real progress, then a ✓ (with "Show in Files") or ✗.
+real progress, then a ✓ (and closes itself) or ✗.
 
-Wayland doesn't let apps place windows, so GNOME positions the card and the
-user drags the file onto it.
+Wayland doesn't let apps place windows, so the bundled GNOME Shell extension
+(data/gnome-extension) moves the card to the pointer. Without it GNOME
+decides where the card appears.
 """
 
 import logging
@@ -40,9 +41,8 @@ ORBIT = 138              # orbit radius (button centres)
 SEG_Y = 58               # segmented control centre
 PAGE_NAMES = ["Convert", "Tools"]
 
-# "Aurora" palette: violet to cyan accent, Apple-style neutrals.
-ACCENT_A = (0.43, 0.36, 1.00)   # #6E5BFF
-ACCENT_B = (0.00, 0.76, 1.00)   # #00C2FF
+# One solid accent (Apple system blue) and Apple-style neutrals. No gradients.
+ACCENT = (0.04, 0.52, 1.00)     # #0A84FF
 GREEN = (0.20, 0.78, 0.35)      # #34C759
 RED = (1.00, 0.27, 0.23)        # #FF453A
 THEMES = {
@@ -83,18 +83,11 @@ def _rounded(cr, x, y, w, h, r):
     cr.close_path()
 
 
-def _accent(x0, y0, x1, y1):
-    g = cairo.LinearGradient(x0, y0, x1, y1)
-    g.add_color_stop_rgb(0, *ACCENT_A)
-    g.add_color_stop_rgb(1, *ACCENT_B)
-    return g
-
-
 class RingWindow(Gtk.Window):
     def __init__(self, app, files: list[Path] | None = None, progress_only=False):
-        # A maximized transparent window: the card is drawn wherever the drag is.
-        # (Not fullscreen: GNOME shows fullscreen windows without transparency.)
-        super().__init__(application=app, decorated=False, title="Orbit")
+        # A compact card-sized window. The title lets the GNOME Shell extension find it.
+        super().__init__(application=app, decorated=False, resizable=False, title="Orbit Panel",
+                         default_width=W, default_height=H)
         self.app = app
         self.add_css_class("orbit-overlay")
         self.files: list[Path] = []
@@ -102,7 +95,7 @@ class RingWindow(Gtk.Window):
         self.pages: list[list[Action]] = []
         self.page = 0
         self.hover = None              # ("btn", i) | ("seg", i) | ("close",) | ("show",) | None
-        self.origin = None             # top-left of the card inside the window
+        self.origin = (0, 0)           # the card fills the window
         self.pointer = None            # pointer position in card coordinates
         self.auto_center = bool(files) or progress_only
         self.scales = {}               # button index -> current scale (hover animation)
@@ -124,7 +117,7 @@ class RingWindow(Gtk.Window):
         self._icons = {}
         self.theme = THEMES["dark" if Adw.StyleManager.get_default().get_dark() else "light"]
 
-        self.area = Gtk.DrawingArea(hexpand=True, vexpand=True)
+        self.area = Gtk.DrawingArea(content_width=W, content_height=H)
         self.area.set_draw_func(self._draw)
         self.set_child(self.area)
 
@@ -149,12 +142,12 @@ class RingWindow(Gtk.Window):
             self.area.add_controller(drop)
         if files:
             self._set_files(files)
-        self.maximize()
 
     # ---- lifecycle ----------------------------------------------------------------
 
     def show_ring(self, timeout_s=None):
         self.present()
+        sounds.play("open")
         self._tick()
         # Nothing dragged onto the card? Get out of the way.
         ms = timeout_s * 1000 if timeout_s else (30000 if self.click_mode else 8000)
@@ -171,23 +164,6 @@ class RingWindow(Gtk.Window):
         if not self.origin:
             return -999, -999
         return x - self.origin[0], y - self.origin[1]
-
-    def _place(self, x, y):
-        """Put the card's centre under (x, y), keep it on screen, and let clicks
-        outside the card reach the windows underneath."""
-        if self.origin:
-            return
-        ww, wh = self.get_width() or 1920, self.get_height() or 1080
-        ox = min(max(x - W / 2, 0), max(0, ww - W))
-        oy = min(max(y - CY, 0), max(0, wh - H))
-        self.origin = (ox, oy)
-        self.appear = 0.0
-        surface = self.get_surface()
-        if surface:
-            region = cairo.Region(cairo.RectangleInt(int(ox + M), int(oy + M), W - 2 * M, H - 2 * M))
-            surface.set_input_region(region)
-        sounds.play("open")
-        self._tick()
 
     def released(self):
         """Mouse button / finger went up. If the drag isn't over the card, it ended elsewhere."""
@@ -284,7 +260,7 @@ class RingWindow(Gtk.Window):
         if ok:
             self.target = 1.0
         self._tick()
-        GLib.timeout_add(3500 if ok else 4500, self._fade_out)
+        GLib.timeout_add(900 if ok else 3000, self._fade_out)
 
     def _fade_out(self):
         def step():
@@ -293,8 +269,6 @@ class RingWindow(Gtk.Window):
             if self.fade <= 0:
                 self.close()
                 return False
-            return True
-        if self.hover == ("show",):  # don't vanish under the pointer
             return True
         GLib.timeout_add(16, step)
         return False
@@ -322,10 +296,6 @@ class RingWindow(Gtk.Window):
     def _hit(self, x, y):
         if math.hypot(x - (M + 22), y - (M + 22)) <= 9:
             return ("close",)
-        if self.mode == "done" and self.outputs:
-            bx, by, bw, bh = self._show_rect()
-            if bx <= x <= bx + bw and by <= y <= by + bh:
-                return ("show",)
         if self.mode != "menu":
             return None
         if len(self.pages) > 1:
@@ -385,8 +355,6 @@ class RingWindow(Gtk.Window):
 
     def _on_motion(self, _t, x, y):
         self._over = True
-        if x or y:
-            self._place(x, y)
         self._hover_at(*self._local(x, y))
         return Gdk.DragAction.COPY
 
@@ -412,9 +380,6 @@ class RingWindow(Gtk.Window):
         if not hit:
             return
         if hit[0] == "close":
-            self.close()
-        elif hit[0] == "show":
-            self.app.show_in_files(self.outputs[0])
             self.close()
         elif hit[0] == "seg":
             self._go_page(hit[1])
@@ -444,11 +409,6 @@ class RingWindow(Gtk.Window):
     # ---- drawing ------------------------------------------------------------------
 
     def _draw(self, _a, cr: cairo.Context, w, h):
-        if self.origin is None and self.auto_center and w > 1:
-            self._place(w / 2, h / 2)
-        if self.origin is None:
-            return
-        cr.translate(*self.origin)
         t = self.theme
         a = _ease(self.appear) * max(0.0, self.fade)
         cr.push_group()
@@ -541,14 +501,11 @@ class RingWindow(Gtk.Window):
             act = self.actions[hb]
             self._text(cr, act.label, CX, H - M - 58, t["label"], 11.5, bold=True)
             self._text(cr, act.hint, CX, H - M - 36, t["secondary"], 9.5, width=W - 2 * M - 40)
-        elif self.files:
-            other = PAGE_NAMES[(self.page + 1) % 2] if len(self.pages) > 1 else ""
-            self._text(cr, "Drop on an action", CX, H - M - 58, t["label"], 11.5, bold=True)
-            self._text(cr, f"Tap Shift or rest on the switch for {other}" if other else "",
-                       CX, H - M - 36, t["secondary"], 9.5)
-        else:
-            self._text(cr, "Drag your file here", CX, H - M - 58, t["label"], 11.5, bold=True)
-            self._text(cr, "Then drop it on what you want to do", CX, H - M - 36, t["secondary"], 9.5)
+        elif self.files and len(self.pages) > 1:
+            other = PAGE_NAMES[(self.page + 1) % 2]
+            self._text(cr, f"Shift for {other}", CX, H - M - 40, t["secondary"], 9.5)
+        elif not self.files:
+            self._text(cr, "Drop a file here", CX, H - M - 40, t["secondary"], 9.5)
 
     def _button(self, cr, i, act):
         """A glossy Apple-style bubble: colour gradient, soft shadow, specular highlight."""
@@ -562,8 +519,8 @@ class RingWindow(Gtk.Window):
 
         cr.new_path()  # shadow / glow
         sh = cairo.RadialGradient(x, y + r * 0.35, r * 0.5, x, y + r * 0.35, r * 1.35)
-        sh.add_color_stop_rgba(0, *(c if hot else (0, 0, 0)), 0.45 if hot else 0.22)
-        sh.add_color_stop_rgba(1, *(c if hot else (0, 0, 0)), 0)
+        sh.add_color_stop_rgba(0, 0, 0, 0, 0.22)
+        sh.add_color_stop_rgba(1, 0, 0, 0, 0)
         cr.arc(x, y + r * 0.35, r * 1.35, 0, 2 * math.pi)
         cr.set_source(sh)
         cr.fill()
@@ -637,7 +594,7 @@ class RingWindow(Gtk.Window):
         if busy:  # progress ring hugging the preview
             pr = 64
             k = _ease(self.morph)
-            cr.set_line_width(6)
+            cr.set_line_width(4)
             cr.set_line_cap(cairo.LINE_CAP_ROUND)
             cr.new_path()
             cr.arc(CX, CY, pr, 0, 2 * math.pi)
@@ -652,7 +609,7 @@ class RingWindow(Gtk.Window):
                 elif self.mode == "done" and frac > 0.99:
                     cr.set_source_rgb(*GREEN)
                 else:
-                    cr.set_source(_accent(CX - pr, CY - pr, CX + pr, CY + pr))
+                    cr.set_source_rgb(*ACCENT)
                 cr.stroke()
             if self.mode in ("done", "error") and (frac > 0.99 or self.mode == "error"):
                 self._badge(cr, CX + 44, CY + 44, ok=self.mode == "done")
@@ -679,27 +636,15 @@ class RingWindow(Gtk.Window):
             cr.line_to(x - 4, y + 4)
         cr.stroke()
 
-    def _show_rect(self):
-        return (CX - 70, H - M - 62, 140, 34)
-
     def _draw_status(self, cr):
         t = self.theme
         if self.mode == "progress":
-            self._text(cr, f"{self.job_label}", CX, SEG_Y, t["label"], 12, bold=True)
-            self._text(cr, f"{int(min(1, self.shown) * 100)}%", CX, CY + 98, t["label"], 20, bold=True)
-            self._text(cr, "Working on it…", CX, CY + 124, t["secondary"], 9.5)
+            self._text(cr, self.job_label, CX, SEG_Y, t["label"], 12, bold=True)
+            self._text(cr, f"{int(min(1, self.shown) * 100)}%", CX, CY + 98, t["secondary"], 13)
         elif self.mode == "done":
-            self._text(cr, "Saved", CX, SEG_Y, t["label"], 12, bold=True)
-            self._text(cr, self.result_text, CX, CY + 100, t["label"], 10.5, bold=True, width=W - 2 * M - 40)
-            if self.outputs:
-                x, y, w, h = self._show_rect()
-                _rounded(cr, x, y, w, h, h / 2)
-                cr.set_source(_accent(x, y, x + w, y + h))
-                cr.fill()
-                self._text(cr, "Show in Files", CX, y + h / 2, (1, 1, 1), 10, bold=True)
+            self._text(cr, self.result_text, CX, CY + 98, t["label"], 10.5, bold=True, width=W - 2 * M - 40)
         else:
-            self._text(cr, "Couldn't finish", CX, SEG_Y, t["label"], 12, bold=True)
-            self._text(cr, self.result_text, CX, CY + 104, t["secondary"], 9.5, width=W - 2 * M - 40)
+            self._text(cr, self.result_text, CX, CY + 100, t["secondary"], 9.5, width=W - 2 * M - 40)
 
     # ---- helpers ------------------------------------------------------------------
 

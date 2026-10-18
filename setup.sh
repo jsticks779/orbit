@@ -19,7 +19,8 @@ warn() { printf '\033[1;31m!\033[0m %s\n' "$*"; }
 
 if [[ "${1:-}" == "--uninstall" ]]; then
   pkill -f "$VENV/bin/orbit" 2>/dev/null || true
-  rm -rf "$PREFIX/share/orbit" "$BIN" "$AUTOSTART" "$NAUTILUS" \
+  gnome-extensions disable orbit@jsticks779.github.io 2>/dev/null || true
+  rm -rf "$PREFIX/share/orbit" "$BIN" "$AUTOSTART" "$NAUTILUS" "$HOME/.local/share/gnome-shell/extensions/orbit@jsticks779.github.io" \
     "$PREFIX/share/applications/$APP_ID.desktop" \
     "$PREFIX/share/icons/hicolor/scalable/apps/$APP_ID.svg"
   ok "Orbit removed. (You are still in the 'input' group; remove with: sudo gpasswd -d $USER input)"
@@ -58,6 +59,24 @@ sed "s|exec orbit|exec $BIN|" "$REPO/data/nautilus/Orbit" | install -Dm755 /dev/
 gtk4-update-icon-cache -q "$PREFIX/share/icons/hicolor" 2>/dev/null || true
 update-desktop-database -q "$PREFIX/share/applications" 2>/dev/null || true
 ok "Added app icon, autostart, and Files → Scripts → Orbit"
+
+# GNOME Shell helper: opens the card under the pointer (Wayland apps can't place windows).
+EXT_UUID="orbit@jsticks779.github.io"
+if command -v gnome-shell >/dev/null; then
+  EXT_DIR="$HOME/.local/share/gnome-shell/extensions/$EXT_UUID"
+  mkdir -p "$EXT_DIR"
+  cp "$REPO/data/gnome-extension/$EXT_UUID/"* "$EXT_DIR/"
+  gnome-extensions enable "$EXT_UUID" 2>/dev/null || python3 - "$EXT_UUID" <<'PY'
+import ast, subprocess, sys
+uuid = sys.argv[1]
+cur = subprocess.run(["gsettings", "get", "org.gnome.shell", "enabled-extensions"],
+                     capture_output=True, text=True).stdout.strip().removeprefix("@as ")
+exts = ast.literal_eval(cur or "[]")
+if uuid not in exts:
+    subprocess.run(["gsettings", "set", "org.gnome.shell", "enabled-extensions", str(exts + [uuid])])
+PY
+  ok "Installed the GNOME helper (active after your next login)"
+fi
 
 # 4. Permission to see drag + Shift ------------------------------------------
 RELOGIN=0

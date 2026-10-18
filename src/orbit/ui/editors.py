@@ -16,7 +16,7 @@ from ..actions.image import open_image, save_as  # noqa: E402
 
 PREVIEW = 520   # longest side of the on-screen preview (px)
 HANDLE = 9
-ACCENT = (0.43, 0.36, 1.0)
+ACCENT = (0.04, 0.52, 1.0)
 
 
 def to_texture(img: Image.Image) -> Gdk.Texture:

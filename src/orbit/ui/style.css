@@ -1,53 +1,29 @@
-/* Orbit: macOS / iOS inspired, "Aurora" accent (violet #6E5BFF to cyan #00C2FF). */
-@define-color accent_bg_color #6E5BFF;
-@define-color accent_color #6E5BFF;
+/* Orbit: quiet, native-feeling styling. One solid accent (Apple system blue). */
+@define-color accent_bg_color #0A84FF;
+@define-color accent_color #0A84FF;
 @define-color accent_fg_color #ffffff;
 
-/* The panel window is see-through; the card is drawn with cairo. */
+/* The card window's corners are see-through; the card is drawn with cairo. */
 window.orbit-overlay,
 window.orbit-overlay > * {
   background: transparent;
   box-shadow: none;
 }
 
-/* Editors: clean Apple-like sheets that follow light/dark mode. */
-window.orbit-editor { border-radius: 16px; }
-window.orbit-editor headerbar {
-  background: transparent;
-  box-shadow: none;
-  min-height: 44px;
-}
-window.orbit-editor .orbit-title { font-weight: 700; font-size: 1.02em; }
-window.orbit-editor .orbit-info { font-weight: 600; opacity: 0.8; font-feature-settings: "tnum"; }
-window.orbit-editor .dim-label { opacity: 0.6; font-weight: 500; }
-window.orbit-editor .orbit-preview {
-  border-radius: 14px;
-  background: alpha(currentColor, 0.05);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
-}
-window.orbit-editor button { border-radius: 9px; font-weight: 500; }
-window.orbit-editor button.circular { border-radius: 999px; min-width: 36px; min-height: 36px; }
-window.orbit-editor button.suggested-action {
-  background-image: linear-gradient(135deg, #6E5BFF, #00C2FF);
-  color: white;
-  font-weight: 650;
-  padding: 7px 20px;
-  border-radius: 10px;
-  box-shadow: 0 6px 16px rgba(110, 91, 255, 0.35);
-}
-window.orbit-editor togglebutton:checked {
-  background: #6E5BFF;
-  color: white;
-}
-window.orbit-editor scale highlight { background-image: linear-gradient(90deg, #6E5BFF, #00C2FF); }
-window.orbit-editor scale trough { min-height: 5px; border-radius: 3px; }
-window.orbit-editor scale slider { background: white; box-shadow: 0 1px 5px rgba(0, 0, 0, 0.3); }
-window.orbit-editor switch:checked { background: #6E5BFF; }
-.orbit-preview { border-radius: 14px; }
+window.orbit-editor { border-radius: 12px; }
+window.orbit-editor headerbar { background: transparent; box-shadow: none; }
+window.orbit-editor .orbit-title { font-weight: 700; }
+window.orbit-editor .orbit-info { font-feature-settings: "tnum"; opacity: 0.75; }
+window.orbit-editor .dim-label { opacity: 0.6; }
+window.orbit-editor .orbit-preview { border-radius: 10px; background: alpha(currentColor, 0.05); }
+window.orbit-editor button.suggested-action { background: #0A84FF; color: white; }
+window.orbit-editor togglebutton:checked { background: #0A84FF; color: white; }
+window.orbit-editor scale highlight { background: #0A84FF; }
+window.orbit-editor switch:checked { background: #0A84FF; }
 button.orbit-swatch {
   min-width: 26px;
   min-height: 26px;
   padding: 0;
   border-radius: 999px;
-  border: 2px solid alpha(currentColor, 0.15);
+  border: 1px solid alpha(currentColor, 0.15);
 }

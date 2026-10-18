@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from PIL import Image, ImageDraw, ImageFilter, ImageOps
 
 GRADIENTS = [
-    ("#6e5bff", "#00c2ff", "#3b8fff"),   # aurora (Orbit default)
+    ("#eceef3", "#cfd4de", "#dde1e9"),   # mist (calm default)
     ("#ff5f6d", "#ffc371", "#ff9a5a"),   # sunset
     ("#a1c4fd", "#c2e9fb", "#b1d6fc"),   # sky
     ("#f093fb", "#f5576c", "#f37bb3"),   # pink

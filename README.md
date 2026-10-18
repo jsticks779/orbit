@@ -20,8 +20,8 @@ Drop it on a slice and the new file appears right next to the original. Your ori
 Tap **Shift** again (or rest on the centre) to flip to the **Tools** page.
 Not sure what **AVIF** or **Metadata** means? Hover a slice and a one-line explanation appears under the ring.
 
-After you drop, the ring turns into a progress circle that fills at the real speed of the job
-(live from ffmpeg for video, page by page for PDFs) and ends with a ✓ and the new file's name.
+After you drop, the card shows real progress (live from ffmpeg for video, page by page for PDFs),
+a ✓ with the new file's name, and then gets out of your way.
 
 ![Progress](docs/progress.png)
 
@@ -50,7 +50,9 @@ cd orbit
 ./setup.sh
 ```
 
-Log out and back in once (so the drag + Shift permission applies). Orbit then starts with your session.
+Log out and back in once. That applies the drag + Shift permission and turns on the small
+GNOME Shell helper that opens the card under your pointer (Wayland apps can't position their
+own windows). Orbit then starts with your session.
 Full details, other ways in and troubleshooting: **[SETUP.md](SETUP.md)**.
 
 ## Other ways to use it
