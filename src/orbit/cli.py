@@ -64,6 +64,18 @@ def cmd_doctor(_args):
     return 0 if all(ok for ok, *_ in checks[:4]) else 1
 
 
+def _own_look():
+    """Ignore ~/.config/gtk-4.0/gtk.css: theme packs (e.g. WhiteSur-Dark) put CSS
+    there that repaints every GTK app. Orbit keeps its own light design."""
+    import os
+    from pathlib import Path
+    home = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+    if (home / "gtk-4.0" / "gtk.css").exists():
+        private = Path.home() / ".local" / "share" / "orbit" / "gtk-config"
+        private.mkdir(parents=True, exist_ok=True)
+        os.environ["XDG_CONFIG_HOME"] = str(private)
+
+
 def _make_dumpable():
     """Started via `sg input` (setgid) the process is non-dumpable, and the
     document portal then can't hand us dropped files. Undo that."""
@@ -100,6 +112,7 @@ def main(argv=None):
                         format="%(asctime)s orbit: %(message)s", datefmt="%H:%M:%S")
     logging.getLogger("PIL").setLevel(logging.INFO)
     _make_dumpable()
+    _own_look()
     from .app import OrbitApp
     app_argv = [sys.argv[0]]
     if args.cmd == "ring":

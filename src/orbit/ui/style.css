@@ -5,7 +5,7 @@
 
 /* The card is a normal borderless window: GNOME rounds it and adds the shadow. */
 window.orbit-card {
-  background-color: @window_bg_color;
+  background-color: #F5F5F7;
   border-radius: 24px;
 }
 window.orbit-card > * { background: transparent; }
