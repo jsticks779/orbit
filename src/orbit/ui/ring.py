@@ -27,6 +27,7 @@ from gi.repository import Adw, Gdk, GdkPixbuf, GLib, Gtk, Pango, PangoCairo  # n
 
 from ..core.actions import Action, pages_for  # noqa: E402
 from ..core.portal import real_paths  # noqa: E402
+from . import sounds  # noqa: E402
 from .thumbs import thumbnail  # noqa: E402
 
 log = logging.getLogger("orbit")
@@ -54,6 +55,20 @@ THEMES = {
 }
 
 
+# Apple-style bubble colours (iOS system palette), laid around the orbit as a rainbow.
+SPECTRUM = [(1.00, 0.23, 0.19), (1.00, 0.58, 0.00), (1.00, 0.80, 0.00), (0.20, 0.78, 0.35),
+            (0.00, 0.78, 0.75), (0.19, 0.69, 0.78), (0.20, 0.68, 0.90), (0.00, 0.48, 1.00),
+            (0.35, 0.34, 0.84), (0.69, 0.32, 0.87), (1.00, 0.18, 0.33)]
+
+
+def bubble_color(i, n):
+    """Evenly sample the spectrum so any number of bubbles forms a smooth rainbow."""
+    pos = (i / max(n, 1)) * (len(SPECTRUM) - 1)
+    a, f = int(pos), pos - int(pos)
+    c0, c1 = SPECTRUM[a], SPECTRUM[min(a + 1, len(SPECTRUM) - 1)]
+    return tuple(c0[k] + (c1[k] - c0[k]) * f for k in range(3))
+
+
 def _ease(t):
     return 1 - (1 - t) ** 3
 
@@ -77,8 +92,9 @@ def _accent(x0, y0, x1, y1):
 
 class RingWindow(Gtk.Window):
     def __init__(self, app, files: list[Path] | None = None, progress_only=False):
-        super().__init__(application=app, decorated=False, resizable=False, title="Orbit",
-                         default_width=W, default_height=H)
+        # A maximized transparent window: the card is drawn wherever the drag is.
+        # (Not fullscreen: GNOME shows fullscreen windows without transparency.)
+        super().__init__(application=app, decorated=False, title="Orbit")
         self.app = app
         self.add_css_class("orbit-overlay")
         self.files: list[Path] = []
@@ -86,6 +102,9 @@ class RingWindow(Gtk.Window):
         self.pages: list[list[Action]] = []
         self.page = 0
         self.hover = None              # ("btn", i) | ("seg", i) | ("close",) | ("show",) | None
+        self.origin = None             # top-left of the card inside the window
+        self.pointer = None            # pointer position in card coordinates
+        self.auto_center = bool(files) or progress_only
         self.scales = {}               # button index -> current scale (hover animation)
         self.appear = 0.0
         self.flip = 1.0
@@ -105,13 +124,13 @@ class RingWindow(Gtk.Window):
         self._icons = {}
         self.theme = THEMES["dark" if Adw.StyleManager.get_default().get_dark() else "light"]
 
-        self.area = Gtk.DrawingArea(content_width=W, content_height=H)
+        self.area = Gtk.DrawingArea(hexpand=True, vexpand=True)
         self.area.set_draw_func(self._draw)
         self.set_child(self.area)
 
         motion = Gtk.EventControllerMotion()
-        motion.connect("motion", lambda _c, x, y: self._hover_at(x, y))
-        motion.connect("leave", lambda *_: self._hover_at(-1, -1))
+        motion.connect("motion", lambda _c, x, y: self._hover_at(*self._local(x, y)))
+        motion.connect("leave", lambda *_: self._hover_at(-999, -999))
         self.area.add_controller(motion)
         click = Gtk.GestureClick()
         click.connect("released", self._on_click)
@@ -130,6 +149,7 @@ class RingWindow(Gtk.Window):
             self.area.add_controller(drop)
         if files:
             self._set_files(files)
+        self.maximize()
 
     # ---- lifecycle ----------------------------------------------------------------
 
@@ -146,6 +166,29 @@ class RingWindow(Gtk.Window):
             self.close()
         return False
 
+    def _local(self, x, y):
+        """Window coordinates -> card coordinates."""
+        if not self.origin:
+            return -999, -999
+        return x - self.origin[0], y - self.origin[1]
+
+    def _place(self, x, y):
+        """Put the card's centre under (x, y), keep it on screen, and let clicks
+        outside the card reach the windows underneath."""
+        if self.origin:
+            return
+        ww, wh = self.get_width() or 1920, self.get_height() or 1080
+        ox = min(max(x - W / 2, 0), max(0, ww - W))
+        oy = min(max(y - CY, 0), max(0, wh - H))
+        self.origin = (ox, oy)
+        self.appear = 0.0
+        surface = self.get_surface()
+        if surface:
+            region = cairo.Region(cairo.RectangleInt(int(ox + M), int(oy + M), W - 2 * M, H - 2 * M))
+            surface.set_input_region(region)
+        sounds.play("open")
+        self._tick()
+
     def released(self):
         """Mouse button / finger went up. If the drag isn't over the card, it ended elsewhere."""
         GLib.timeout_add(700, lambda: (self._close_if_idle(), False)[1])
@@ -160,6 +203,7 @@ class RingWindow(Gtk.Window):
 
     def _go_page(self, n):
         if n != self.page:
+            sounds.play("switch")
             self.page = n
             self.flip = 0.0
             self.scales.clear()
@@ -195,8 +239,8 @@ class RingWindow(Gtk.Window):
         if self.flip < 1:
             self.flip = min(1.0, self.flip + 1 / 9)
             busy = True
-        for i in list(self.scales) + [h for h in [self._hover_btn()] if h is not None]:
-            want = 1.14 if self._hover_btn() == i else 1.0
+        for i in range(len(self.actions)):
+            want = self._magnify(i)
             cur = self.scales.get(i, 1.0)
             if abs(want - cur) > 0.002:
                 self.scales[i] = cur + (want - cur) * 0.3
@@ -221,6 +265,7 @@ class RingWindow(Gtk.Window):
 
     def start_progress(self, label: str):
         self.mode = "progress"
+        sounds.play("start")
         self.job_label = label
         self.target = self.shown = 0.0
         self._t0 = time.monotonic()
@@ -233,6 +278,7 @@ class RingWindow(Gtk.Window):
 
     def finish(self, ok: bool, text: str, outputs=()):
         self.mode = "done" if ok else "error"
+        sounds.play("success" if ok else "error")
         self.result_text = text
         self.outputs = list(outputs)
         if ok:
@@ -293,13 +339,25 @@ class RingWindow(Gtk.Window):
                 return ("btn", i)
         return None
 
+    def _magnify(self, i):
+        """Apple Watch style: bubbles near the pointer grow."""
+        if not self.pointer or self.mode != "menu":
+            return 1.0
+        bx, by = self._btn_pos(i)
+        d = math.hypot(self.pointer[0] - bx, self.pointer[1] - by)
+        return 1.0 + 0.24 * math.exp(-(d / 62) ** 2)
+
     def _hover_btn(self):
         return self.hover[1] if self.hover and self.hover[0] == "btn" else None
 
     def _hover_at(self, x, y):
+        self.pointer = (x, y) if x > -900 else None
+        self._tick()  # bubbles magnify as the pointer moves
         hit = self._hit(x, y)
         if hit == self.hover:
             return
+        if hit and hit[0] == "btn":
+            sounds.play("hover")
         self.hover = hit
         if self._seg_timer:
             GLib.source_remove(self._seg_timer)
@@ -327,17 +385,19 @@ class RingWindow(Gtk.Window):
 
     def _on_motion(self, _t, x, y):
         self._over = True
-        self._hover_at(x, y)
+        if x or y:
+            self._place(x, y)
+        self._hover_at(*self._local(x, y))
         return Gdk.DragAction.COPY
 
     def _on_leave(self, _t):
         self._over = False
-        self._hover_at(-1, -1)
+        self._hover_at(-999, -999)
 
     def _on_drop(self, _t, value, x, y):
         self._over = False
         self._set_files(self._files_from(value) or self.files)
-        hit = self._hit(x, y)
+        hit = self._hit(*self._local(x, y))
         if hit and hit[0] == "btn" and hit[1] < len(self.actions):
             self._choose(self.actions[hit[1]])
         elif hit and hit[0] == "seg":
@@ -348,7 +408,7 @@ class RingWindow(Gtk.Window):
         return True
 
     def _on_click(self, _g, _n, x, y):
-        hit = self._hit(x, y)
+        hit = self._hit(*self._local(x, y))
         if not hit:
             return
         if hit[0] == "close":
@@ -384,6 +444,11 @@ class RingWindow(Gtk.Window):
     # ---- drawing ------------------------------------------------------------------
 
     def _draw(self, _a, cr: cairo.Context, w, h):
+        if self.origin is None and self.auto_center and w > 1:
+            self._place(w / 2, h / 2)
+        if self.origin is None:
+            return
+        cr.translate(*self.origin)
         t = self.theme
         a = _ease(self.appear) * max(0.0, self.fade)
         cr.push_group()
@@ -486,27 +551,56 @@ class RingWindow(Gtk.Window):
             self._text(cr, "Then drop it on what you want to do", CX, H - M - 36, t["secondary"], 9.5)
 
     def _button(self, cr, i, act):
+        """A glossy Apple-style bubble: colour gradient, soft shadow, specular highlight."""
         t = self.theme
         x, y = self._btn_pos(i)
         r = self._btn_radius() * self.scales.get(i, 1.0)
         hot = self._hover_btn() == i
-        cr.new_path()
-        if hot:  # glow
-            glow = cairo.RadialGradient(x, y + 4, r * 0.6, x, y + 4, r + 14)
-            glow.add_color_stop_rgba(0, *ACCENT_A, 0.35)
-            glow.add_color_stop_rgba(1, *ACCENT_A, 0)
-            cr.arc(x, y + 4, r + 14, 0, 2 * math.pi)
-            cr.set_source(glow)
-            cr.fill()
-        cr.arc(x, y, r, 0, 2 * math.pi)
-        cr.set_source(_accent(x - r, y - r, x + r, y + r)) if hot else cr.set_source_rgba(*t["fill"])
+        c = bubble_color(i, len(self.actions))
+        light = tuple(min(1, v + (1 - v) * 0.35) for v in c)
+        deep = tuple(v * 0.78 for v in c)
+
+        cr.new_path()  # shadow / glow
+        sh = cairo.RadialGradient(x, y + r * 0.35, r * 0.5, x, y + r * 0.35, r * 1.35)
+        sh.add_color_stop_rgba(0, *(c if hot else (0, 0, 0)), 0.45 if hot else 0.22)
+        sh.add_color_stop_rgba(1, *(c if hot else (0, 0, 0)), 0)
+        cr.arc(x, y + r * 0.35, r * 1.35, 0, 2 * math.pi)
+        cr.set_source(sh)
         cr.fill()
-        ink = (1, 1, 1) if hot else t["label"]
+
+        body = cairo.RadialGradient(x - r * 0.3, y - r * 0.45, r * 0.1, x, y, r * 1.05)
+        body.add_color_stop_rgb(0, *light)
+        body.add_color_stop_rgb(0.55, *c)
+        body.add_color_stop_rgb(1, *deep)
+        cr.arc(x, y, r, 0, 2 * math.pi)
+        cr.set_source(body)
+        cr.fill()
+
+        cr.save()  # specular highlight: a soft glossy cap
+        cr.translate(x, y - r * 0.42)
+        cr.scale(r * 0.62, r * 0.36)
+        gloss = cairo.LinearGradient(0, -1, 0, 1)
+        gloss.add_color_stop_rgba(0, 1, 1, 1, 0.55)
+        gloss.add_color_stop_rgba(1, 1, 1, 1, 0.0)
+        cr.arc(0, 0, 1, 0, 2 * math.pi)
+        cr.set_source(gloss)
+        cr.fill()
+        cr.restore()
+
+        cr.arc(x, y, r - 0.5, 0, 2 * math.pi)  # crisp rim
+        cr.set_source_rgba(1, 1, 1, 0.9 if hot else 0.25)
+        cr.set_line_width(2 if hot else 1)
+        cr.stroke()
+
+        # Light bubbles (yellow) get dark ink so labels stay readable.
+        lum = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+        ink = (0.25, 0.18, 0.0) if lum > 0.68 else (1, 1, 1)
         if act.icon and self._paint_icon(cr, act.icon, x - 10, y - 10, ink):
-            self._text(cr, act.label, x, y + r + 12, t["label"] if not hot else ACCENT_A, 8.5, bold=hot)
+            self._text(cr, act.label, x, y + r + 12, t["label"], 8.5, bold=hot)
         else:
-            size = 10.5 if len(act.label) <= 4 else 8.5
-            self._text(cr, act.label, x, y, ink, size, bold=True)
+            size = (10.5 if len(act.label) <= 4 else 8.5) * min(1.12, self.scales.get(i, 1.0))
+            self._text(cr, act.label, x, y + 0.5, (0, 0, 0, 0.18), size, bold=True)  # soft text shadow
+            self._text(cr, act.label, x, y - 0.5, ink, size, bold=True)
 
     def _draw_centre(self, cr):
         """File preview, or the progress ring around it."""
