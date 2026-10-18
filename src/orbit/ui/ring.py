@@ -54,6 +54,7 @@ class RingWindow(Gtk.Window):
         self._dwell = None
         self._close_timer = None
         self._entered = False
+        self._over = False            # a drag is currently hovering the overlay
 
         self.area = Gtk.DrawingArea(hexpand=True, vexpand=True)
         self.area.set_draw_func(self._draw)
@@ -123,8 +124,9 @@ class RingWindow(Gtk.Window):
         return not done
 
     def released(self):
-        """Mouse button went up (from the gesture watcher). If nothing was dropped, close."""
-        GLib.timeout_add(350, lambda: (self.close() if not self.click_mode else None, False)[1])
+        """Button/finger went up. Touchpad tap-and-drag lifts the finger mid-drag,
+        so only close if no drag is hovering the ring any more."""
+        GLib.timeout_add(350, lambda: (self.close() if not self._over and not self.click_mode else None, False)[1])
 
     def next_page(self):
         if len(self.pages) > 1:
@@ -173,6 +175,7 @@ class RingWindow(Gtk.Window):
         import logging
         logging.getLogger("orbit").info("drag entered ring at %.0f,%.0f", x, y)
         self._entered = True
+        self._over = True
         # GNOME reports (0, 0) when a drag enters a freshly opened window;
         # wait for the first real motion to place the ring under the cursor.
         if x or y:
@@ -196,8 +199,11 @@ class RingWindow(Gtk.Window):
         return Gdk.DragAction.COPY
 
     def _on_leave(self, _t):
+        # The overlay covers the screen, so leaving means the drag ended or was cancelled.
+        self._over = False
         self.hover = None
         self.area.queue_draw()
+        GLib.timeout_add(400, lambda: (self.close() if not self._over and not self.click_mode else None, False)[1])
 
     def _on_drop(self, _t, value, x, y):
         files = [Path(f.get_path()) for f in value.get_files() if f.get_path()]

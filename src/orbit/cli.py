@@ -64,6 +64,16 @@ def cmd_doctor(_args):
     return 0 if all(ok for ok, *_ in checks[:4]) else 1
 
 
+def _make_dumpable():
+    """Started via `sg input` (setgid) the process is non-dumpable, and the
+    document portal then can't hand us dropped files. Undo that."""
+    try:
+        import ctypes
+        ctypes.CDLL(None).prctl(4, 1, 0, 0, 0)  # PR_SET_DUMPABLE = 4
+    except Exception:
+        pass
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(prog="orbit", description="Convert and edit files with a drag + Shift.")
     parser.add_argument("--version", action="version", version=f"orbit {__version__}")
@@ -89,6 +99,7 @@ def main(argv=None):
     logging.basicConfig(level=logging.DEBUG if os.environ.get("ORBIT_DEBUG") else logging.INFO,
                         format="%(asctime)s orbit: %(message)s", datefmt="%H:%M:%S")
     logging.getLogger("PIL").setLevel(logging.INFO)
+    _make_dumpable()
     from .app import OrbitApp
     app_argv = [sys.argv[0]]
     if args.cmd == "ring":
