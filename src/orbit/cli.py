@@ -1,0 +1,91 @@
+"""Command line entry point.
+
+    orbit                      start the background service (drag + Shift)
+    orbit ring [FILES...]      open the ring now (drop zone, or for FILES)
+    orbit list FILES...        show which actions fit these files
+    orbit run ACTION FILES...  run one action, e.g. `orbit run image.to_png a.jpg`
+    orbit doctor               check that everything Orbit needs is installed
+"""
+
+import argparse
+import shutil
+import sys
+from pathlib import Path
+
+from . import __version__
+
+
+def _paths(items):
+    paths = [Path(p).expanduser().resolve() for p in items]
+    missing = [p for p in paths if not p.exists()]
+    if missing:
+        sys.exit(f"orbit: not found: {', '.join(map(str, missing))}")
+    return paths
+
+
+def cmd_list(args):
+    from .core.actions import pages_for
+    for n, page in enumerate(pages_for(_paths(args.files))):
+        print(["Convert", "Tools"][n] if len(page) else "")
+        for a in page:
+            print(f"  {a.id:<22} {a.label}{'  (opens editor)' if a.dialog else ''}")
+
+
+def cmd_run(args):
+    from .actions import ActionError
+    from .core.actions import get
+    act = get(args.action)
+    if act.dialog:
+        sys.exit(f"orbit: {act.label} needs the editor, use `orbit ring FILE` instead")
+    try:
+        for out in act.run(_paths(args.files)):
+            print(out)
+    except ActionError as e:
+        sys.exit(f"orbit: {e}")
+
+
+def cmd_doctor(_args):
+    import os
+    checks = []
+    for mod, why in [("gi", "the interface (sudo apt install python3-gi gir1.2-adw-1)"),
+                     ("PIL", "images"), ("pymupdf", "PDFs"), ("evdev", "drag + Shift detection"),
+                     ("pdf2docx", "PDF to DOCX (optional)"), ("pi_heif", "HEIC images (optional)")]:
+        try:
+            __import__(mod)
+            checks.append((True, mod, why))
+        except ImportError:
+            checks.append((False, mod, why))
+    for tool, why in [("ffmpeg", "audio and video"), ("soffice", "office documents"), ("gs", "smaller PDFs")]:
+        checks.append((bool(shutil.which(tool)), tool, why))
+    readable = any(os.access(f"/dev/input/{d}", os.R_OK) for d in os.listdir("/dev/input") if d.startswith("event"))
+    checks.append((readable, "input access", "drag + Shift (run setup.sh, then log out and back in)"))
+    for ok, name, why in checks:
+        print(f"  {'✓' if ok else '✗'} {name:<14} {why}")
+    return 0 if all(ok for ok, *_ in checks[:4]) else 1
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(prog="orbit", description="Convert and edit files with a drag + Shift.")
+    parser.add_argument("--version", action="version", version=f"orbit {__version__}")
+    sub = parser.add_subparsers(dest="cmd")
+    ring = sub.add_parser("ring", help="open the ring now")
+    ring.add_argument("files", nargs="*")
+    sub.add_parser("list", help="list actions for files").add_argument("files", nargs="+")
+    run = sub.add_parser("run", help="run an action")
+    run.add_argument("action")
+    run.add_argument("files", nargs="+")
+    sub.add_parser("doctor", help="check dependencies")
+    args = parser.parse_args(argv)
+
+    if args.cmd == "list":
+        return cmd_list(args)
+    if args.cmd == "run":
+        return cmd_run(args)
+    if args.cmd == "doctor":
+        return cmd_doctor(args)
+
+    from .app import OrbitApp
+    app_argv = [sys.argv[0]]
+    if args.cmd == "ring":
+        app_argv += ["--ring", *[str(p) for p in _paths(args.files)]] if args.files else ["--ring"]
+    return OrbitApp().run(app_argv)

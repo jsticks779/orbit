@@ -1,0 +1,38 @@
+/* The ring overlay must be fully see-through; the ring is drawn with cairo. */
+window.orbit-overlay,
+window.orbit-overlay > * {
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Warm, soft editors to match the ring. */
+window.orbit-editor {
+  background: linear-gradient(160deg, #ffd9b8 0%, #f7a97c 55%, #ee8a6a 100%);
+  color: #4a2a18;
+}
+window.orbit-editor headerbar {
+  background: transparent;
+  box-shadow: none;
+  color: #4a2a18;
+}
+window.orbit-editor .dim-label { opacity: 0.75; }
+window.orbit-editor button.suggested-action {
+  background: #e84a2f;
+  color: white;
+}
+window.orbit-editor togglebutton:checked {
+  background: #e84a2f;
+  color: white;
+}
+window.orbit-editor scale highlight { background: #e84a2f; }
+.orbit-preview {
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.08);
+}
+button.orbit-swatch {
+  min-width: 26px;
+  min-height: 26px;
+  padding: 0;
+  border-radius: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+}

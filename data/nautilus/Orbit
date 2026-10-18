@@ -1,0 +1,5 @@
+#!/bin/sh
+# Files (Nautilus) → right-click → Scripts → Orbit
+IFS='
+'
+exec orbit ring $NAUTILUS_SCRIPT_SELECTED_FILE_PATHS
