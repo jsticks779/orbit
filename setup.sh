@@ -64,8 +64,14 @@ RELOGIN=0
 if ! id -nG "$USER" | grep -qw input; then
   say "Orbit reads mouse button and Shift key events to detect drag + Shift."
   say "That needs your user in the 'input' group (see SECURITY.md)."
-  read -rp "  Add $USER to the input group now? [Y/n] " yn
-  if [[ "${yn:-Y}" =~ ^[Yy]$ ]]; then
+  yn=n
+  if [[ -t 0 ]]; then
+    read -rp "  Add $USER to the input group now? [Y/n] " yn || yn=n
+    yn="${yn:-Y}"
+  else
+    warn "Not interactive. Later run: sudo usermod -aG input $USER"
+  fi
+  if [[ "$yn" =~ ^[Yy]$ ]]; then
     sudo usermod -aG input "$USER" && RELOGIN=1 && ok "Added. Log out and back in once."
   else
     warn "Skipped. Drag + Shift won't work, but right-click → Scripts → Orbit will."

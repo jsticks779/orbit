@@ -21,12 +21,18 @@ def open_image(path: Path) -> Image.Image:
     return ImageOps.exif_transpose(img)
 
 
-def _enable_heif():
+def _enable_heif(write=False):
+    """pillow-heif reads and writes HEIC; pi-heif (smaller) only reads."""
     global _heif_ready
     try:
-        from pi_heif import register_heif_opener
-    except ImportError as e:
-        raise ActionError("HEIC needs the pi-heif package (pip install pi-heif).") from e
+        from pillow_heif import register_heif_opener
+    except ImportError:
+        if write:
+            raise ActionError("Saving HEIC needs pillow-heif (pip install pillow-heif).") from None
+        try:
+            from pi_heif import register_heif_opener
+        except ImportError as e:
+            raise ActionError("HEIC needs pillow-heif (pip install pillow-heif).") from e
     register_heif_opener()
     _heif_ready = True
 
@@ -50,7 +56,7 @@ def save_as(src: Path, fmt: str, suffix: str = "", img: Image.Image | None = Non
     elif img.mode not in ("RGB", "RGBA", "L", "LA"):
         img = img.convert("RGBA")
     if fmt == "heic":
-        _enable_heif()
+        _enable_heif(write=True)
     opts = {
         "jpg": dict(format="JPEG", quality=92, optimize=True),
         "jpeg": dict(format="JPEG", quality=92, optimize=True),

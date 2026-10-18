@@ -42,7 +42,7 @@ python3 -m venv --system-site-packages .venv
 | Ring opens with few or no slices | The file type isn't supported yet. Check with `orbit list FILE`. |
 | "ffmpeg is not installed" | `sudo apt install ffmpeg` |
 | DOCX / PPTX conversions fail | `sudo apt install libreoffice` |
-| HEIC or PDF→DOCX missing | `~/.local/share/orbit/venv/bin/pip install pi-heif pdf2docx` |
+| HEIC or PDF→DOCX missing | `~/.local/share/orbit/venv/bin/pip install pillow-heif pdf2docx` |
 
 ## Uninstall
 

@@ -49,7 +49,7 @@ def cmd_doctor(_args):
     checks = []
     for mod, why in [("gi", "the interface (sudo apt install python3-gi gir1.2-adw-1)"),
                      ("PIL", "images"), ("pymupdf", "PDFs"), ("evdev", "drag + Shift detection"),
-                     ("pdf2docx", "PDF to DOCX (optional)"), ("pi_heif", "HEIC images (optional)")]:
+                     ("pdf2docx", "PDF to DOCX (optional)"), ("pillow_heif", "HEIC images (optional)")]:
         try:
             __import__(mod)
             checks.append((True, mod, why))
