@@ -84,6 +84,11 @@ def main(argv=None):
     if args.cmd == "doctor":
         return cmd_doctor(args)
 
+    import logging
+    import os
+    logging.basicConfig(level=logging.DEBUG if os.environ.get("ORBIT_DEBUG") else logging.INFO,
+                        format="%(asctime)s orbit: %(message)s", datefmt="%H:%M:%S")
+    logging.getLogger("PIL").setLevel(logging.INFO)
     from .app import OrbitApp
     app_argv = [sys.argv[0]]
     if args.cmd == "ring":

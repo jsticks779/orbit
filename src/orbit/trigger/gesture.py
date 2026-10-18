@@ -25,7 +25,7 @@ class GestureWatcher(threading.Thread):
         self.on_summon, self.on_shift, self.on_release = on_summon, on_shift, on_release
         self.sel = selectors.DefaultSelector()
         self.devices = {}
-        self.button_down_at = None
+        self.held = {}             # what is pressing: "btn" or "touch:<device>" -> since
         self.summoned = False
         self.error = None
 
@@ -51,7 +51,7 @@ class GestureWatcher(threading.Thread):
             except OSError:
                 continue
             keys = dev.capabilities().get(e.EV_KEY, [])
-            if e.BTN_LEFT in keys or e.KEY_LEFTSHIFT in keys:
+            if e.BTN_LEFT in keys or e.KEY_LEFTSHIFT in keys or e.BTN_TOUCH in keys:
                 self.devices[path] = dev
                 self.sel.register(dev, selectors.EVENT_READ)
             else:
@@ -77,18 +77,25 @@ class GestureWatcher(threading.Thread):
                 for ev in events:
                     if ev.type != e.EV_KEY:
                         continue
-                    if ev.code == e.BTN_LEFT:
+                    # A drag can come from a mouse button, a finger on the touchpad
+                    # (tap-and-drag sends no button event) or a touchscreen/pen.
+                    if ev.code in (e.BTN_LEFT, e.BTN_TOUCH):
+                        who = "btn" if ev.code == e.BTN_LEFT else f"touch:{dev.path}"
                         if ev.value == 1:
-                            self.button_down_at = time.monotonic()
+                            self.held.setdefault(who, time.monotonic())
                         elif ev.value == 0:
-                            self.button_down_at = None
-                            if self.summoned:
+                            self.held.pop(who, None)
+                            if self.summoned and not self.held:
                                 self.summoned = False
                                 self.on_release()
-                    elif ev.code in shifts and ev.value == 1 and self.button_down_at:
+                    elif ev.code in shifts and ev.value == 1:
+                        since = min(self.held.values(), default=None)
+                        log.debug("shift (holding: %s)", ", ".join(self.held) or "nothing")
+                        if since is None:
+                            continue
                         if self.summoned:
                             self.on_shift()
-                        elif time.monotonic() - self.button_down_at >= HOLD_BEFORE_SHIFT:
+                        elif time.monotonic() - since >= HOLD_BEFORE_SHIFT:
                             self.summoned = True
                             self.on_summon()
             if time.monotonic() - last_scan > RESCAN_EVERY:

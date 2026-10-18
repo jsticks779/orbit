@@ -81,6 +81,7 @@ class OrbitApp(Adw.Application):
         return False
 
     def _summon(self):
+        log.info("drag + Shift detected: opening ring")
         if not self.ring:
             self.open_ring()
 
@@ -89,12 +90,14 @@ class OrbitApp(Adw.Application):
             self.ring.next_page()
 
     def _release(self):
+        log.debug("mouse released")
         if self.ring:
             self.ring.released()
 
     # ---- running actions -----------------------------------------------------
 
     def perform(self, action: Action, files: list[Path]):
+        log.info("%s on %s", action.id, ", ".join(p.name for p in files))
         if action.dialog:
             from .ui.editors import EDITORS
             try:

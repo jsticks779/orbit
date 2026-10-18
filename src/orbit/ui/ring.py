@@ -82,12 +82,14 @@ class RingWindow(Gtk.Window):
 
     # ---- lifecycle ----------------------------------------------------------
 
-    def show_ring(self, timeout_s=8):
+    def show_ring(self, timeout_s=None):
         self.present()
         if self.click_mode:
             GLib.idle_add(self._place_middle)
         # Nothing dragged in? Get out of the way.
-        self._close_timer = GLib.timeout_add_seconds(timeout_s, self._timeout)
+        # Shift pressed without a real drag (e.g. finger resting on the touchpad)? Close fast.
+        ms = timeout_s * 1000 if timeout_s else (8000 if self.click_mode else 2500)
+        self._close_timer = GLib.timeout_add(ms, self._timeout)
 
     def _timeout(self):
         self._close_timer = None
@@ -168,8 +170,13 @@ class RingWindow(Gtk.Window):
     # ---- drag and drop --------------------------------------------------------
 
     def _on_enter(self, _t, x, y):
+        import logging
+        logging.getLogger("orbit").info("drag entered ring at %.0f,%.0f", x, y)
         self._entered = True
-        self._place(x, y)
+        # GNOME reports (0, 0) when a drag enters a freshly opened window;
+        # wait for the first real motion to place the ring under the cursor.
+        if x or y:
+            self._place(x, y)
         return Gdk.DragAction.COPY
 
     def _on_value(self, target, _pspec):
@@ -184,6 +191,7 @@ class RingWindow(Gtk.Window):
             self.area.queue_draw()
 
     def _on_motion(self, _t, x, y):
+        self._place(x, y)
         self._hover_at(x, y)
         return Gdk.DragAction.COPY
 
