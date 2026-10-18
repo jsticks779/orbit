@@ -117,7 +117,7 @@ class RingWindow(Gtk.Window):
         self._entered = self._over = False
         self._ticking = False
         self._icons = {}
-        self.theme = THEMES["dark" if Adw.StyleManager.get_default().get_dark() else "light"]
+        self.theme = THEMES["light"]  # Orbit is always light
 
         self.area = Gtk.DrawingArea(content_width=W, content_height=H)
         self.area.set_draw_func(self._draw)

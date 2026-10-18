@@ -31,7 +31,7 @@ class OrbitApp(Adw.Application):
 
     def do_startup(self):
         Adw.Application.do_startup(self)
-        Adw.StyleManager.get_default().set_color_scheme(Adw.ColorScheme.DEFAULT)  # follow system
+        Adw.StyleManager.get_default().set_color_scheme(Adw.ColorScheme.FORCE_LIGHT)  # always light
         css = Gtk.CssProvider()
         css.load_from_path(str(Path(__file__).parent / "ui" / "style.css"))
         Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), css,
