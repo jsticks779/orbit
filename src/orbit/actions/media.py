@@ -9,6 +9,7 @@ from ..core.naming import output_path
 from . import ActionError, need
 
 VID, AUD = [Kind.VIDEO], [Kind.AUDIO]
+FF = ("!ffmpeg",)
 HINT = "Install it with: sudo apt install ffmpeg"
 
 
@@ -56,13 +57,13 @@ _AUDIO_ARGS = {
 
 
 def _video(fmt, order):
-    @action(f"video.to_{fmt}", fmt.upper(), VID, skip_ext={fmt}, order=order)
+    @action(f"video.to_{fmt}", fmt.upper(), VID, skip_ext={fmt}, order=order, requires=FF)
     def convert(paths):
         return [ffmpeg(p, output_path(p, fmt), *_VIDEO_ARGS[fmt]) for p in paths]
 
 
 def _audio(fmt, order, kinds):
-    @action(f"{kinds[0].value}.to_{fmt}", fmt.upper(), kinds, skip_ext={fmt}, order=order)
+    @action(f"{kinds[0].value}.to_{fmt}", fmt.upper(), kinds, skip_ext={fmt}, order=order, requires=FF)
     def convert(paths):
         return [ffmpeg(p, output_path(p, fmt), *_AUDIO_ARGS[fmt]) for p in paths]
 
@@ -74,13 +75,13 @@ for i, f in enumerate(_AUDIO_ARGS):
     _audio(f, i, AUD)
 
 
-@action("video.gif", "GIF", VID, order=5)
+@action("video.gif", "GIF", VID, order=5, requires=FF)
 def to_gif(paths):
     vf = "fps=12,scale=480:-1:flags=lanczos,split[a][b];[a]palettegen[p];[b][p]paletteuse"
     return [ffmpeg(p, output_path(p, "gif"), "-vf", vf) for p in paths]
 
 
-@action("video.trim", "Trim", VID, page=TOOLS, dialog="trim", order=-1)
+@action("video.trim", "Trim", VID, page=TOOLS, dialog="trim", order=-1, requires=FF)
 def trim(paths):  # handled by the trim editor
     return []
 
@@ -101,22 +102,22 @@ def export_clip(src, start: float, end: float, mute=False, speed=1.0):
     return ffmpeg(src, out, *args, pre=["-ss", f"{start:.3f}", "-t", f"{end - start:.3f}"], length=(end - start) / speed)
 
 
-@action("video.compress", "Compress", VID, page=TOOLS, icon="compress", order=0)
+@action("video.compress", "Compress", VID, page=TOOLS, icon="compress", order=0, requires=FF)
 def compress_video(paths):
     return [ffmpeg(p, output_path(p, "mp4", "Compressed"), "-vf", "scale='min(1280,iw)':-2",
                    "-c:v", "libx264", "-crf", "28", "-preset", "slow", "-c:a", "aac", "-b:a", "96k") for p in paths]
 
 
-@action("video.mute", "Mute", VID, page=TOOLS, icon="mute", order=1)
+@action("video.mute", "Mute", VID, page=TOOLS, icon="mute", order=1, requires=FF)
 def mute(paths):
     return [ffmpeg(p, output_path(p, p.suffix.lstrip("."), "Muted"), "-c:v", "copy", "-an") for p in paths]
 
 
-@action("video.frame", "First Frame", VID, page=TOOLS, icon="images", order=2)
+@action("video.frame", "First Frame", VID, page=TOOLS, icon="images", order=2, requires=FF)
 def frame(paths):
     return [ffmpeg(p, output_path(p, "jpg", "Frame"), "-frames:v", "1", "-q:v", "2") for p in paths]
 
 
-@action("audio.normalize", "Normalize", AUD, page=TOOLS, icon="volume", order=0)
+@action("audio.normalize", "Normalize", AUD, page=TOOLS, icon="volume", order=0, requires=FF)
 def normalize(paths):
     return [ffmpeg(p, output_path(p, p.suffix.lstrip("."), "Normalized"), "-af", "loudnorm") for p in paths]

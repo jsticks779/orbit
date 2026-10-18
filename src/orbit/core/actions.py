@@ -27,16 +27,17 @@ class Action:
     skip_ext: set[str] = field(default_factory=set)  # hide "PNG" for .png files
     order: int = 50
     hint: str = ""                 # one-line explanation shown while hovering
+    requires: tuple = ()           # python modules or programs it needs
 
 
 _REGISTRY: list[Action] = []
 
 
-def action(id, label, kinds, page=CONVERT, icon="", multi=False, dialog=None, skip_ext=(), order=50):
+def action(id, label, kinds, page=CONVERT, icon="", multi=False, dialog=None, skip_ext=(), order=50, requires=()):
     def deco(fn):
         from .hints import hint_for, icon_for
         _REGISTRY.append(Action(id, label, set(kinds), fn, page, icon_for(label), multi, dialog,
-                                set(skip_ext), order, hint_for(id, label)))
+                                set(skip_ext), order, hint_for(id, label), tuple(requires)))
         return fn
     return deco
 
@@ -59,6 +60,13 @@ def get(action_id: str) -> Action:
     raise KeyError(action_id)
 
 
+def available(a: Action) -> bool:
+    """Hide slices whose tool isn't installed, instead of offering them and failing."""
+    import importlib.util
+    import shutil
+    return all(shutil.which(r[1:]) if r.startswith("!") else importlib.util.find_spec(r) for r in a.requires)
+
+
 def actions_for(paths: list[Path]) -> list[Action]:
     kind = common_kind(paths)
     exts = {p.suffix.lower().lstrip(".") for p in paths}
@@ -72,6 +80,8 @@ def actions_for(paths: list[Path]) -> list[Action]:
         if a.multi and not many:
             continue
         if exts and exts <= a.skip_ext:
+            continue
+        if not available(a):
             continue
         out.append(a)
     return sorted(out, key=lambda a: (a.page, a.order))

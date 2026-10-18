@@ -60,7 +60,7 @@ def to_txt(paths):
     return outs
 
 
-@action("pdf.to_docx", "DOCX", PDF, order=3)
+@action("pdf.to_docx", "DOCX", PDF, order=3, requires=("pdf2docx",))
 def to_docx(paths):
     try:
         from pdf2docx import Converter
@@ -170,7 +170,7 @@ def soffice_convert(src: Path, fmt: str) -> Path:
 
 
 def _office(fmt: str, label: str, order: int, kinds=OFFICE):
-    @action(f"office.to_{fmt}", label, kinds, skip_ext={fmt}, order=order)
+    @action(f"office.to_{fmt}", label, kinds, skip_ext={fmt}, order=order, requires=("!soffice",))
     def convert(paths):
         return [soffice_convert(p, fmt) for p in paths]
 

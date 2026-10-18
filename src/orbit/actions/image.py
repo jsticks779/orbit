@@ -75,7 +75,8 @@ def save_as(src: Path, fmt: str, suffix: str = "", img: Image.Image | None = Non
 def _converter(fmt: str, order: int):
     skip = {fmt, "jpeg"} if fmt == "jpg" else {fmt, "tif"} if fmt == "tiff" else {fmt, "heif"} if fmt == "heic" else {fmt}
 
-    @action(f"image.to_{fmt}", fmt.upper(), IMG, skip_ext=skip, order=order)
+    @action(f"image.to_{fmt}", fmt.upper(), IMG, skip_ext=skip, order=order,
+            requires=("pillow_heif",) if fmt == "heic" else ())
     def convert(paths: list[Path]) -> list[Path]:
         outs = []
         for i, p in enumerate(paths, 1):
