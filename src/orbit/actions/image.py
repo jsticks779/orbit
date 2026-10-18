@@ -4,6 +4,7 @@ from pathlib import Path
 
 from PIL import Image, ImageOps
 
+from ..core import progress
 from ..core.actions import TOOLS, action
 from ..core.filetypes import Kind
 from ..core.naming import output_path
@@ -76,7 +77,11 @@ def _converter(fmt: str, order: int):
 
     @action(f"image.to_{fmt}", fmt.upper(), IMG, skip_ext=skip, order=order)
     def convert(paths: list[Path]) -> list[Path]:
-        return [save_as(p, fmt) for p in paths]
+        outs = []
+        for i, p in enumerate(paths, 1):
+            outs.append(save_as(p, fmt))
+            progress.step(i, len(paths))
+        return outs
 
 
 for i, f in enumerate(["jpg", "png", "webp", "avif", "heic", "tiff", "bmp", "pdf", "ico", "gif"]):
@@ -103,6 +108,11 @@ def compress(paths):
 
 @action("image.crop", "Crop", IMG, page=TOOLS, icon="crop", dialog="crop", order=1)
 def crop(paths):  # handled by the crop dialog
+    return []
+
+
+@action("image.edit", "Edit", IMG, page=TOOLS, dialog="adjust", order=1)
+def edit(paths):  # handled by the adjust editor
     return []
 
 

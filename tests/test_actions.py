@@ -65,3 +65,26 @@ def test_backdrop_ratio_and_padding(png):
     assert out.size == (160, 120)
     out = backdrop.render(img, backdrop.Backdrop(padding=20, ratio="1:1"))
     assert out.width == out.height
+
+
+def test_every_slice_has_an_explanation(png):
+    from orbit.core.actions import all_actions
+    missing = [a.id for a in all_actions() if not a.hint]
+    assert not missing, missing
+
+
+def test_normal_paths_pass_through_portal_lookup(png):
+    from orbit.core.portal import real_path
+    assert real_path(png) == png
+
+
+def test_progress_reports_per_page(png):
+    from orbit.core import progress
+    seen = []
+    progress.set_callback(seen.append)
+    try:
+        pdf = get("image.to_pdf").run([png])[0]
+        get("pdf.merge").run([pdf, pdf])
+    finally:
+        progress.set_callback(None)
+    assert seen and seen[-1] == 1.0

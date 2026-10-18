@@ -18,18 +18,29 @@ A ring opens under your cursor with everything you can do to that file.
 Drop it on a slice and the new file appears right next to the original. Your original is never touched.
 
 Tap **Shift** again (or rest on the centre) to flip to the **Tools** page.
+Not sure what **AVIF** or **Metadata** means? Hover a slice and a one-line explanation appears under the ring.
+
+After you drop, the ring turns into a progress circle that fills at the real speed of the job
+(live from ffmpeg for video, page by page for PDFs) and ends with a ✓ and the new file's name.
+
+![Progress](docs/progress.png)
 
 | Drop a… | Convert to | Tools |
 |---|---|---|
-| **Image** | JPG · PNG · WEBP · AVIF · HEIC · TIFF · BMP · PDF · ICO · GIF | Compress · Crop · Add BG · Metadata · Rotate · Half Size · Grayscale |
+| **Image** | JPG · PNG · WEBP · AVIF · HEIC · TIFF · BMP · PDF · ICO · GIF | Compress · Crop · **Edit** · Add BG · Metadata · Rotate · Half Size · Grayscale |
 | **PDF** | JPG · PNG · TXT · DOCX | Compress · Split Pages · Rotate · Extract Images |
 | **Word / Office** | PDF · DOCX · ODT · TXT | |
-| **Video** | MP4 · WEBM · MOV · MKV · GIF · MP3 | Compress · Mute · First Frame |
+| **Video** | MP4 · WEBM · MOV · MKV · GIF · MP3 | **Trim** · Compress · Mute · First Frame |
 | **Audio** | MP3 · WAV · OGG · FLAC · M4A · OPUS | Normalize |
 | **Several files** | Images → One PDF · PDFs → Merge | ZIP (any files) |
 
-**Crop** and **Add BG** open small editors: aspect presets and exact pixel sizes for cropping;
-gradients, padding, rounded corners, shadow and ratio for backgrounds.
+Small editors open for the tools that need choices:
+- **Crop**: drag handles, aspect presets (1:1, 16:9, 9:16, 4:3, 3:4), exact pixel size
+- **Edit**: brightness, contrast, saturation, warmth, sharpness, rotate and flip
+- **Add BG**: gradients or colours, padding, rounded corners, shadow, ratio
+- **Trim** (video): start and end with live frame preview, speed 0.5x to 2x, remove sound
+
+Results are always saved **next to the original**, wherever it is.
 
 ## Install (Ubuntu 24.04+)
 

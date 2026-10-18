@@ -24,13 +24,17 @@ def to_texture(img: Image.Image) -> Gdk.Texture:
 
 
 class _Editor(Gtk.Window):
-    def __init__(self, app, path: Path, title: str, apply_label: str):
+    def __init__(self, app, path: Path, title: str, apply_label: str, load_image=True):
         super().__init__(application=app, title=title, default_width=600, resizable=False)
-        self.app, self.path = app, path
+        self.app, self.path, self.label = app, path, title
         self.add_css_class("orbit-editor")
-        self.img = open_image(path)
+        self.img = open_image(path) if load_image else None
 
-        header = Gtk.HeaderBar()
+        # Close on the left, centred bold title: like the original.
+        header = Gtk.HeaderBar(decoration_layout="close:")
+        name = Gtk.Label(label=title)
+        name.add_css_class("orbit-title")
+        header.set_title_widget(name)
         self.set_titlebar(header)
         self.body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14,
                             margin_top=16, margin_bottom=16, margin_start=18, margin_end=18)
@@ -71,9 +75,12 @@ class _Editor(Gtk.Window):
         return box
 
     def _apply(self):
-        out = self.save()
+        job = self.job()  # read widget values now, on the UI thread
         self.close()
-        self.app.done([out])
+        self.app.run_job(lambda: [job()], self.label)
+
+    def job(self):
+        return self.save
 
 
 # ---- Crop ------------------------------------------------------------------------
@@ -281,4 +288,186 @@ class BackgroundEditor(_Editor):
         return save_as(self.path, "png", "With Background", backdrop.render(self.img, self.opt))
 
 
-EDITORS = {"crop": CropEditor, "background": BackgroundEditor}
+
+
+# ---- Edit (adjust) -------------------------------------------------------------------
+
+def adjust(img: Image.Image, o: dict) -> Image.Image:
+    """Pure function shared by preview and save."""
+    from PIL import ImageEnhance, ImageFilter
+    img = img.convert("RGBA")
+    if o["rotate"]:
+        img = img.rotate(-o["rotate"], expand=True)
+    if o["flip_h"]:
+        img = img.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+    if o["flip_v"]:
+        img = img.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+    alpha = img.getchannel("A")
+    rgb = img.convert("RGB")
+    for key, enh in (("brightness", ImageEnhance.Brightness), ("contrast", ImageEnhance.Contrast),
+                     ("saturation", ImageEnhance.Color)):
+        if o[key]:
+            rgb = enh(rgb).enhance(1 + o[key] / 100)
+    if o["warmth"]:
+        w = o["warmth"] / 100 * 0.25
+        r, g, b = rgb.split()
+        r = r.point(lambda v: min(255, int(v * (1 + w))))
+        b = b.point(lambda v: min(255, int(v * (1 - w))))
+        rgb = Image.merge("RGB", (r, g, b))
+    if o["sharpness"]:
+        rgb = rgb.filter(ImageFilter.UnsharpMask(radius=2, percent=int(o["sharpness"] * 2), threshold=2))
+    rgb.putalpha(alpha)
+    return rgb
+
+
+class AdjustEditor(_Editor):
+    SLIDERS = (("brightness", -100, 100), ("contrast", -100, 100), ("saturation", -100, 100),
+               ("warmth", -100, 100), ("sharpness", 0, 100))
+
+    def __init__(self, app, path: Path):
+        super().__init__(app, path, "Edit Image", "Save Edited")
+        self.small = self.img.copy()
+        self.small.thumbnail((PREVIEW, PREVIEW))
+        self._pending = None
+        self.picture = Gtk.Picture(content_fit=Gtk.ContentFit.CONTAIN, height_request=340)
+        self.picture.add_css_class("orbit-preview")
+        self.body.append(self.picture)
+
+        tools = Gtk.Box(spacing=6, halign=Gtk.Align.CENTER)
+        for icon, tip, fn in (("object-rotate-left-symbolic", "Rotate left", lambda: self._turn(-90)),
+                              ("object-rotate-right-symbolic", "Rotate right", lambda: self._turn(90)),
+                              ("object-flip-horizontal-symbolic", "Flip horizontal", lambda: self._flip("flip_h")),
+                              ("object-flip-vertical-symbolic", "Flip vertical", lambda: self._flip("flip_v"))):
+            b = Gtk.Button(icon_name=icon, tooltip_text=tip)
+            b.add_css_class("circular")
+            b.connect("clicked", lambda _b, f=fn: f())
+            tools.append(b)
+        self.body.append(tools)
+
+        self.sliders = {}
+        for name, lo, hi in self.SLIDERS:
+            sc = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, lo, hi, 1)
+            sc.set_draw_value(True)
+            sc.set_value_pos(Gtk.PositionType.RIGHT)
+            if lo < 0:
+                sc.add_mark(0, Gtk.PositionType.BOTTOM, None)
+            sc.connect("value-changed", lambda s, n=name: self._set(n, int(s.get_value())))
+            self.sliders[name] = sc
+            self.body.append(self.row(name.title(), sc))
+        self.body.append(self.footer)
+        self.reset()
+
+    def reset(self):
+        self.opt = {"rotate": 0, "flip_h": False, "flip_v": False, **{n: 0 for n, *_ in self.SLIDERS}}
+        for sc in self.sliders.values():
+            sc.set_value(0)
+        self._refresh()
+
+    def _turn(self, deg):
+        self.opt["rotate"] = (self.opt["rotate"] + deg) % 360
+        self._set()
+
+    def _flip(self, key):
+        self.opt[key] = not self.opt[key]
+        self._set()
+
+    def _set(self, key=None, value=None):
+        if key:
+            self.opt[key] = value
+        if not self._pending:
+            self._pending = GLib.timeout_add(40, self._refresh)
+
+    def _refresh(self):
+        self._pending = None
+        self.picture.set_paintable(to_texture(adjust(self.small, self.opt)))
+        return False
+
+    def save(self) -> Path:
+        fmt = self.path.suffix.lstrip(".") or "png"
+        return save_as(self.path, fmt, "Edited", adjust(self.img, self.opt))
+
+
+# ---- Trim video ----------------------------------------------------------------------
+
+def _fmt_time(t):
+    return f"{int(t // 60)}:{t % 60:04.1f}"
+
+
+class TrimEditor(_Editor):
+    SPEEDS = {"0.5x": 0.5, "1x": 1.0, "1.5x": 1.5, "2x": 2.0}
+
+    def __init__(self, app, path: Path):
+        super().__init__(app, path, "Trim Video", "Export Clip", load_image=False)
+        from ..actions.media import duration
+        self.length = duration(path) or 1.0
+        self.speed, self._pending, self._frame_at = 1.0, None, None
+
+        self.picture = Gtk.Picture(content_fit=Gtk.ContentFit.CONTAIN, height_request=320)
+        self.picture.add_css_class("orbit-preview")
+        self.body.append(self.picture)
+        self.info = Gtk.Label(xalign=0.5)
+        self.info.add_css_class("orbit-info")
+        self.body.append(self.info)
+
+        self.start = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, self.length, 0.1)
+        self.end = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, self.length, 0.1)
+        for sc, which in ((self.start, "start"), (self.end, "end")):
+            sc.set_draw_value(False)
+            sc.connect("value-changed", self._moved, which)
+        self.body.append(self.row("Start", self.start))
+        self.body.append(self.row("End", self.end))
+        self.body.append(self.row("Speed", self.chips(self.SPEEDS, "1x", self._set_speed)))
+        self.mute = Gtk.Switch(halign=Gtk.Align.START)
+        self.body.append(self.row("Remove sound", self.mute))
+        self.body.append(self.footer)
+        self.reset()
+
+    def reset(self):
+        self.start.set_value(0)
+        self.end.set_value(self.length)
+        self.mute.set_active(False)
+        self._show_frame(0)
+
+    def _set_speed(self, name):
+        self.speed = self.SPEEDS[name]
+        self._update_info()
+
+    def _moved(self, scale, which):
+        s, e = self.start.get_value(), self.end.get_value()
+        if s > e - 0.2:  # keep at least 0.2 s
+            if which == "start":
+                self.start.set_value(max(0, e - 0.2))
+            else:
+                self.end.set_value(min(self.length, s + 0.2))
+            return
+        self._update_info()
+        self._frame_at = scale.get_value()
+        if not self._pending:
+            self._pending = GLib.timeout_add(120, lambda: self._show_frame(self._frame_at))
+
+    def _update_info(self):
+        s, e = self.start.get_value(), self.end.get_value()
+        self.info.set_text(f"{_fmt_time(s)}  →  {_fmt_time(e)}     clip {_fmt_time((e - s) / self.speed)}")
+
+    def _show_frame(self, t):
+        self._pending = None
+        import subprocess
+        try:
+            png = subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{t:.2f}", "-i", str(self.path), "-frames:v", "1",
+                                  "-vf", f"scale={PREVIEW}:-2", "-f", "image2pipe", "-c:v", "png", "-"],
+                                 capture_output=True, timeout=10).stdout
+            if png:
+                self.picture.set_paintable(Gdk.Texture.new_from_bytes(GLib.Bytes.new(png)))
+        except (OSError, subprocess.TimeoutExpired, GLib.Error):
+            pass
+        self._update_info()
+        return False
+
+    def job(self):
+        from ..actions.media import export_clip
+        args = (self.path, self.start.get_value(), self.end.get_value())
+        kw = dict(mute=self.mute.get_active(), speed=self.speed)
+        return lambda: export_clip(*args, **kw)
+
+
+EDITORS = {"crop": CropEditor, "background": BackgroundEditor, "adjust": AdjustEditor, "trim": TrimEditor}

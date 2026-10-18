@@ -4,6 +4,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
+from ..core import progress
 from ..core.actions import TOOLS, action
 from ..core.filetypes import Kind
 from ..core.naming import output_dir, output_path
@@ -34,6 +35,7 @@ def pdf_to_images(src: Path, fmt: str, dpi: int = 200) -> list[Path]:
         out = folder / f"{src.stem} {i:03d}.{fmt}"
         page.get_pixmap(dpi=dpi).save(out)
         outs.append(out)
+        progress.step(i, doc.page_count)
     return outs
 
 
@@ -79,8 +81,9 @@ def merge(paths):
     fitz = _fitz()
     paths = sorted(paths)
     doc = fitz.open()
-    for p in paths:
+    for i, p in enumerate(paths, 1):
         doc.insert_pdf(fitz.open(p))
+        progress.step(i, len(paths))
     out = output_path(paths[0], "pdf", "Merged")
     doc.save(out, garbage=3, deflate=True)
     return [out]
@@ -113,6 +116,7 @@ def split(paths):
             out = folder / f"{p.stem} {i + 1:03d}.pdf"
             one.save(out)
             outs.append(out)
+            progress.step(i + 1, src.page_count)
     return outs
 
 

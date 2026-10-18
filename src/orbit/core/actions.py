@@ -21,11 +21,12 @@ class Action:
     kinds: set[Kind]
     run: Callable[[list[Path]], list[Path]]
     page: int = CONVERT
-    icon: str = ""                 # symbolic icon name, optional
+    icon: str = ""                 # symbolic icon name (filled from core.hints)
     multi: bool = False            # needs 2+ files (merge, combine)
     dialog: str | None = None      # opens a UI dialog instead of running directly
     skip_ext: set[str] = field(default_factory=set)  # hide "PNG" for .png files
     order: int = 50
+    hint: str = ""                 # one-line explanation shown while hovering
 
 
 _REGISTRY: list[Action] = []
@@ -33,7 +34,9 @@ _REGISTRY: list[Action] = []
 
 def action(id, label, kinds, page=CONVERT, icon="", multi=False, dialog=None, skip_ext=(), order=50):
     def deco(fn):
-        _REGISTRY.append(Action(id, label, set(kinds), fn, page, icon, multi, dialog, set(skip_ext), order))
+        from .hints import hint_for, icon_for
+        _REGISTRY.append(Action(id, label, set(kinds), fn, page, icon_for(label), multi, dialog,
+                                set(skip_ext), order, hint_for(id, label)))
         return fn
     return deco
 

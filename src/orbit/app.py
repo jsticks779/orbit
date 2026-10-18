@@ -96,7 +96,9 @@ class OrbitApp(Adw.Application):
 
     # ---- running actions -----------------------------------------------------
 
-    def perform(self, action: Action, files: list[Path]):
+    def perform(self, action: Action, files: list[Path], ring=None):
+        from .core.portal import real_paths
+        files = real_paths(files)
         log.info("%s on %s", action.id, ", ".join(p.name for p in files))
         if action.dialog:
             from .ui.editors import EDITORS
@@ -105,19 +107,42 @@ class OrbitApp(Adw.Application):
             except Exception as e:  # unreadable image etc.
                 self.fail(e)
             return
+        self.run_job(lambda: action.run(files), action.label, ring)
+
+    def run_job(self, fn, label: str, ring=None):
+        """Run fn() in a worker thread with a live progress circle."""
+        from .core import progress
+        from .ui.ring import RingWindow
+        if ring is None:  # e.g. from an editor: show the circle mid-screen
+            ring = RingWindow(self, progress_only=True)
+            ring.present()
+        ring.start_progress(label)
         self.hold()
 
         def work():
+            progress.set_callback(lambda f: GLib.idle_add(ring.set_progress, f))
             try:
-                outs = action.run(files)
-                GLib.idle_add(self.done, outs)
+                outs = fn()
+                GLib.idle_add(self._finished, ring, outs, None)
             except Exception as e:
-                log.exception("action %s failed", action.id)
-                GLib.idle_add(self.fail, e)
+                log.exception("%s failed", label)
+                GLib.idle_add(self._finished, ring, [], e)
             finally:
+                progress.set_callback(None)
                 GLib.idle_add(self.release)
 
         threading.Thread(target=work, daemon=True).start()
+
+    def _finished(self, ring, outs, err):
+        if err:
+            msg = str(err) if isinstance(err, ActionError) else "Something went wrong"
+            ring.finish(False, msg)
+            self.fail(err)
+        else:
+            name = outs[0].name if len(outs) == 1 else f"{len(outs)} files saved"
+            ring.finish(True, name if outs else "Done")
+            self.done(outs)
+        return False
 
     def done(self, outs: list[Path]):
         if not outs:

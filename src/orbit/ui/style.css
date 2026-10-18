@@ -36,3 +36,20 @@ button.orbit-swatch {
   border-radius: 8px;
   border: 2px solid rgba(255, 255, 255, 0.85);
 }
+
+/* Editor polish: soft card, centred bold title, rounded controls. */
+window.orbit-editor { border-radius: 18px; }
+window.orbit-editor .orbit-title { font-weight: 800; font-size: 1.05em; letter-spacing: 0.3px; }
+window.orbit-editor .orbit-info { font-weight: 700; opacity: 0.85; font-feature-settings: "tnum"; }
+window.orbit-editor .orbit-preview { border-radius: 16px; box-shadow: 0 8px 24px rgba(80, 30, 10, 0.25); }
+window.orbit-editor button { border-radius: 10px; }
+window.orbit-editor button.circular { border-radius: 999px; background: rgba(255, 255, 255, 0.55); }
+window.orbit-editor button.suggested-action {
+  background: linear-gradient(180deg, #ff6a3d, #d93a22);
+  box-shadow: 0 4px 12px rgba(217, 58, 34, 0.35);
+  font-weight: 700;
+  padding: 6px 18px;
+}
+window.orbit-editor scale trough { background: rgba(255, 255, 255, 0.55); min-height: 6px; border-radius: 3px; }
+window.orbit-editor scale slider { background: white; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25); }
+window.orbit-editor switch:checked { background: #e84a2f; }
