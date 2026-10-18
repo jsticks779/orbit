@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orbit: drag, shift, done</title>
+<meta name="description" content="Orbit converts and edits any file with a drag + Shift. Free and open source for Ubuntu.">
+<meta property="og:title" content="Orbit: drag, shift, done">
+<meta property="og:description" content="Convert and edit any file with a drag + Shift. Free and open source for Ubuntu.">
+<meta property="og:image" content="assets/shot-convert.png">
+<link rel="icon" type="image/png" href="assets/favicon-32.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800;900&family=Geist+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink: #0a0a0a;
+  --sun: #ffd60a;
+  --graphite: #5e5e5b;
+  --muted: #6b6b6b;
+  --hair: #ececea;
+  --paper: #f7f7f5;
+  --card-shadow: 0 0 0 1px rgba(0,0,0,.06), 0 34px 70px -30px rgba(0,0,0,.3);
+  --gutter: 60px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; scroll-behavior: smooth; }
+body { font-family: Geist, system-ui, sans-serif; color: var(--ink); background: #fff; }
+a { color: inherit; text-decoration: none; }
+img, video { display: block; max-width: 100%; }
+.wrap { max-width: 1320px; margin: 0 auto; padding: 0 var(--gutter); }
+
+/* type */
+.mono { font-family: "Geist Mono", ui-monospace, monospace; font-weight: 600; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--graphite); }
+.tag { font-family: "Geist Mono", ui-monospace, monospace; font-weight: 600; font-size: 12px; letter-spacing: .08em; background: var(--sun); color: var(--ink); padding: 5px 9px; border-radius: 6px; display: inline-block; }
+.h-xl { font-weight: 900; font-size: clamp(76px, 10vw, 148px); line-height: .86; letter-spacing: -.065em; }
+.h-l { font-weight: 800; font-size: clamp(44px, 5.4vw, 76px); line-height: .95; letter-spacing: -.05em; }
+.h-m { font-weight: 700; font-size: 22px; letter-spacing: -.02em; }
+.lede { font-size: 20px; line-height: 30px; color: var(--graphite); max-width: 480px; }
+.body { font-size: 16px; line-height: 24px; color: #3a3a38; }
+
+/* buttons */
+.pill { display: inline-flex; align-items: center; gap: 10px; background: var(--ink); color: #fff; font-weight: 600; font-size: 16px; padding: 14px 22px; border-radius: 999px; transition: transform .15s; }
+.pill:hover { transform: translateY(-1px); }
+.pill-sm { font-size: 14px; padding: 9px 16px; }
+.play { display: inline-flex; align-items: center; gap: 12px; font-weight: 600; font-size: 16px; }
+.play-ring { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; box-shadow: inset 0 0 0 1.5px var(--ink); }
+.link { font-weight: 500; font-size: 15px; }
+.link:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* nav */
+.nav { display: flex; align-items: center; justify-content: space-between; padding-top: 26px; padding-bottom: 26px; }
+.logo { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 26px; letter-spacing: -.045em; }
+.logo img { width: 42px; height: 42px; }
+.nav-links { display: flex; align-items: center; gap: 28px; }
+
+/* hero */
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 40px; align-items: center; min-height: 720px; padding-bottom: 60px; }
+.hero-copy { display: flex; flex-direction: column; gap: 30px; }
+.kicker { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.ctas { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+.stage { position: relative; height: 640px; }
+.card { background: #fff; border-radius: 22px; box-shadow: var(--card-shadow); }
+.demo-card { position: absolute; left: 50%; top: 50%; width: min(520px, 100%); transform: translate(-50%, -50%); overflow: hidden; background: var(--paper); }
+.demo-card video { width: 100%; aspect-ratio: 600 / 640; object-fit: cover; }
+.orby-float { position: absolute; width: 150px; left: -10px; top: 18px; animation: bob 3.2s ease-in-out infinite; }
+.toast { position: absolute; right: -6px; bottom: 70px; display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; width: 240px; border-radius: 18px; }
+.toast-head { display: flex; align-items: center; gap: 8px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: #34c759; }
+.chip { position: absolute; font-family: "Geist Mono", monospace; font-weight: 600; font-size: 12px; letter-spacing: .06em; background: #fff; padding: 7px 10px; border-radius: 8px; box-shadow: 0 0 0 1px rgba(0,0,0,.07), 0 12px 24px -14px rgba(0,0,0,.35); animation: drift 6s ease-in-out infinite; }
+.chip.c2 { animation-delay: -2s; } .chip.c3 { animation-delay: -4s; }
+@keyframes bob { 0%,100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-10px) rotate(-2deg); } }
+@keyframes drift { 0%,100% { transform: translate(0,0); } 50% { transform: translate(6px,-8px); } }
+
+/* sections */
+.band { padding: 120px 0; }
+.band.gray { background: var(--paper); }
+.band.ink { background: var(--ink); color: #fff; }
+.band.ink .mono { color: #a3a3a0; }
+.band.ink .body { color: #c9c9c6; }
+.sec-head { display: flex; flex-direction: column; gap: 18px; max-width: 760px; margin-bottom: 60px; }
+
+.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
+.step { display: flex; flex-direction: column; gap: 16px; }
+.step .card { overflow: hidden; background: var(--paper); }
+.step img { width: 100%; }
+
+.kinds { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--hair); }
+.kind { padding: 28px 28px 32px 0; border-bottom: 1px solid var(--hair); display: flex; flex-direction: column; gap: 14px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.fmt { font-family: "Geist Mono", monospace; font-weight: 600; font-size: 12px; letter-spacing: .04em; background: #fff; border: 1px solid var(--hair); padding: 5px 8px; border-radius: 6px; }
+.fmt.tool { background: var(--paper); }
+
+.tools { display: grid; grid-template-columns: repeat(2, 1fr); gap: 28px; }
+.tool-card { padding: 28px; display: flex; flex-direction: column; gap: 18px; }
+.ba { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.ba figure { display: flex; flex-direction: column; gap: 8px; }
+.ba img { border-radius: 12px; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: var(--paper); }
+.ba img.contain { object-fit: contain; }
+.trim { display: flex; flex-direction: column; gap: 12px; padding: 18px; background: var(--paper); border-radius: 12px; }
+.strip { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; position: relative; }
+.strip span { aspect-ratio: 16 / 10; border-radius: 4px; background: #d9d9d6; }
+.strip span.in { background: var(--ink); }
+.trim-row { display: flex; justify-content: space-between; }
+
+.privacy { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; }
+.privacy div { display: flex; flex-direction: column; gap: 12px; border-top: 1px solid #2a2a28; padding-top: 22px; }
+
+.install { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center; }
+.code { position: relative; background: var(--ink); color: #f2f2f0; border-radius: 18px; padding: 26px 28px; font-family: "Geist Mono", monospace; font-size: 15px; line-height: 28px; overflow-x: auto; }
+.code .c { color: #8a8a86; }
+.code .p { color: var(--sun); }
+.copy { position: absolute; right: 14px; top: 14px; font-family: "Geist Mono", monospace; font-size: 12px; font-weight: 600; letter-spacing: .06em; background: #232321; color: #fff; border: 0; border-radius: 8px; padding: 7px 10px; cursor: pointer; }
+.copy:hover { background: #333331; }
+
+.final { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 28px; padding: 140px 0 120px; }
+.final img { width: 120px; animation: bob 3.2s ease-in-out infinite; }
+.footer { display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap; padding: 28px 0 40px; border-top: 1px solid var(--hair); }
+
+@media (prefers-reduced-motion: reduce) { .orby-float, .chip, .final img { animation: none; } html { scroll-behavior: auto; } }
+@media (max-width: 1000px) {
+  :root { --gutter: 22px; }
+  .hero { grid-template-columns: 1fr; min-height: 0; }
+  .stage { height: 560px; }
+  .steps, .kinds, .tools, .privacy, .install { grid-template-columns: 1fr; }
+  .nav-links .link { display: none; }
+  .band { padding: 80px 0; }
+}
+@media (max-width: 520px) {
+  .stage { height: 470px; }
+  .orby-float { width: 96px; }
+  .toast { width: 200px; bottom: 10px; }
+  .chip { display: none; }
+}
+</style>
+</head>
+<body>
+
+<header class="wrap nav">
+  <a class="logo" href="#"><img src="assets/orby.svg" alt="">orbit</a>
+  <nav class="nav-links">
+    <a class="link" href="#how">How it works</a>
+    <a class="link" href="#formats">Formats</a>
+    <a class="link" href="https://github.com/jsticks779/orbit">Open source</a>
+    <a class="pill pill-sm" href="#install">Install</a>
+  </nav>
+</header>
+
+<main>
+  <section class="wrap hero">
+    <div class="hero-copy">
+      <div class="kicker"><span class="tag">DRAG + SHIFT</span><span class="mono">File tools for Ubuntu</span></div>
+      <h1 class="h-xl">Drag.<br>Shift.<br>Done.</h1>
+      <p class="lede">Start dragging any file, tap Shift, and drop it on what you want: a new format, a smaller size, a crop, a clean background. The result lands right next to the original.</p>
+      <div class="ctas">
+        <a class="pill" href="#install">Install on Ubuntu</a>
+        <a class="play" href="#how"><span class="play-ring"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 1.5v11l9-5.5z" fill="currentColor"/></svg></span>See how it works</a>
+      </div>
+    </div>
+
+    <div class="stage" aria-label="Orbit in action">
+      <div class="card demo-card">
+        <video autoplay muted loop playsinline poster="assets/shot-convert.png">
+          <source src="assets/demo.webm" type="video/webm">
+          <source src="assets/demo.mp4" type="video/mp4">
+        </video>
+      </div>
+      <img class="orby-float" src="assets/orby.svg" alt="">
+      <span class="chip" style="right:6%;top:6%">PDF → JPG</span>
+      <span class="chip c2" style="left:2%;bottom:20%">MP4 → GIF</span>
+      <span class="chip c3" style="right:0;top:42%">HEIC → PNG</span>
+      <div class="card toast">
+        <div class="toast-head"><span class="dot"></span><span class="mono" style="color:var(--ink)">Saved</span></div>
+        <span style="font-weight:500">Sunset.webp</span>
+        <span class="mono" style="font-size:11px">Right next to Sunset.jpg</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="band gray" id="how">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="mono">How it works</span>
+        <h2 class="h-l">One gesture.<br>No app to open.</h2>
+      </div>
+      <div class="steps">
+        <div class="step">
+          <div class="card"><img src="assets/shot-convert.png" alt="Orbit card showing conversion bubbles" loading="lazy"></div>
+          <span class="mono">01</span>
+          <span class="h-m">Drag and tap Shift</span>
+          <p class="body">Start dragging a file from Files or your desktop, then tap Shift. Orbit's card opens right under your pointer.</p>
+        </div>
+        <div class="step">
+          <div class="card"><img src="assets/shot-tools.png" alt="Orbit card showing tools" loading="lazy"></div>
+          <span class="mono">02</span>
+          <span class="h-m">Pick a bubble</span>
+          <p class="body">Bubbles grow as you get close, and a short line tells you what each one does. Tap Shift again for Tools.</p>
+        </div>
+        <div class="step">
+          <div class="card"><img src="assets/shot-done.png" alt="Orbit card showing a finished conversion" loading="lazy"></div>
+          <span class="mono">03</span>
+          <span class="h-m">Drop. That's it.</span>
+          <p class="body">Real progress while it works, a soft chime when it's done, and the new file sits next to the original.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="formats">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="mono">Formats</span>
+        <h2 class="h-l">Every file.<br>The right options.</h2>
+        <p class="lede">Orbit only shows what makes sense for the file you're holding, and hides anything your system can't do.</p>
+      </div>
+      <div class="kinds">
+        <div class="kind"><span class="h-m">Images</span><div class="chips"><span class="fmt">JPG</span><span class="fmt">PNG</span><span class="fmt">WEBP</span><span class="fmt">AVIF</span><span class="fmt">HEIC</span><span class="fmt">TIFF</span><span class="fmt">BMP</span><span class="fmt">GIF</span><span class="fmt">ICO</span><span class="fmt">PDF</span></div><div class="chips"><span class="fmt tool">Compress</span><span class="fmt tool">Crop</span><span class="fmt tool">Edit</span><span class="fmt tool">Add BG</span><span class="fmt tool">Metadata</span><span class="fmt tool">Rotate</span></div></div>
+        <div class="kind"><span class="h-m">PDF</span><div class="chips"><span class="fmt">JPG</span><span class="fmt">PNG</span><span class="fmt">TXT</span><span class="fmt">DOCX</span></div><div class="chips"><span class="fmt tool">Compress</span><span class="fmt tool">Split pages</span><span class="fmt tool">Rotate</span><span class="fmt tool">Extract images</span><span class="fmt tool">Merge</span></div></div>
+        <div class="kind"><span class="h-m">Documents</span><div class="chips"><span class="fmt">PDF</span><span class="fmt">DOCX</span><span class="fmt">ODT</span><span class="fmt">TXT</span></div><div class="chips"><span class="fmt tool">Word</span><span class="fmt tool">PowerPoint</span><span class="fmt tool">Excel</span><span class="fmt tool">LibreOffice</span></div></div>
+        <div class="kind"><span class="h-m">Video</span><div class="chips"><span class="fmt">MP4</span><span class="fmt">WEBM</span><span class="fmt">MOV</span><span class="fmt">MKV</span><span class="fmt">GIF</span><span class="fmt">MP3</span></div><div class="chips"><span class="fmt tool">Trim</span><span class="fmt tool">Compress</span><span class="fmt tool">Mute</span><span class="fmt tool">First frame</span></div></div>
+        <div class="kind"><span class="h-m">Audio</span><div class="chips"><span class="fmt">MP3</span><span class="fmt">WAV</span><span class="fmt">OGG</span><span class="fmt">FLAC</span><span class="fmt">M4A</span><span class="fmt">OPUS</span></div><div class="chips"><span class="fmt tool">Normalize</span></div></div>
+        <div class="kind"><span class="h-m">Many files</span><div class="chips"><span class="fmt">One PDF</span><span class="fmt">Merge PDFs</span><span class="fmt">ZIP</span></div><p class="body">Drag several at once. Orbit knows what to offer.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band gray" id="tools">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="mono">Editors</span>
+        <h2 class="h-l">Small editors.<br>Big results.</h2>
+        <p class="lede">Some tools need a choice or two. Orbit opens a tiny editor with a live preview, then gets out of your way.</p>
+      </div>
+      <div class="tools">
+        <div class="card tool-card">
+          <span class="h-m">Crop</span>
+          <div class="ba"><figure><img src="assets/ex-original.jpg" alt="Original photo" loading="lazy"><span class="mono">Before</span></figure><figure><img class="contain" src="assets/ex-crop.jpg" alt="Cropped to 16:9" loading="lazy"><span class="mono">16:9 crop</span></figure></div>
+          <p class="body">Drag the handles or pick 1:1, 16:9, 9:16, 4:3, 3:4. Type exact pixels if you need them.</p>
+        </div>
+        <div class="card tool-card">
+          <span class="h-m">Edit</span>
+          <div class="ba"><figure><img src="assets/ex-original.jpg" alt="Original photo" loading="lazy"><span class="mono">Before</span></figure><figure><img src="assets/ex-edit.jpg" alt="Warmer, more saturated" loading="lazy"><span class="mono">Warmer, punchier</span></figure></div>
+          <p class="body">Brightness, contrast, saturation, warmth and sharpness, plus rotate and flip.</p>
+        </div>
+        <div class="card tool-card">
+          <span class="h-m">Add BG</span>
+          <div class="ba"><figure><img class="contain" src="assets/ex-bg-mist.png" alt="Photo on a soft grey background" loading="lazy"><span class="mono">Mist</span></figure><figure><img class="contain" src="assets/ex-bg-sunset.png" alt="Photo on a sunset gradient" loading="lazy"><span class="mono">Sunset</span></figure></div>
+          <p class="body">Screenshots and photos on a clean background with rounded corners, a soft shadow and the ratio you need.</p>
+        </div>
+        <div class="card tool-card">
+          <span class="h-m">Trim</span>
+          <div class="trim">
+            <div class="strip"><span></span><span></span><span class="in"></span><span class="in"></span><span class="in"></span><span class="in"></span><span></span><span></span></div>
+            <div class="trim-row"><span class="mono">0:12.4 → 0:31.0</span><span class="mono">2x · No sound</span></div>
+          </div>
+          <p class="body">Pick a start and end with a live frame preview, speed it up or slow it down, and drop the sound.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band ink">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="mono">Privacy</span>
+        <h2 class="h-l">Your files never<br>leave your computer.</h2>
+      </div>
+      <div class="privacy">
+        <div><span class="h-m">No internet</span><p class="body">Orbit makes no network connections. No accounts, no uploads, no tracking.</p></div>
+        <div><span class="h-m">Originals untouched</span><p class="body">Every result is a new file next to the original. Nothing is ever overwritten.</p></div>
+        <div><span class="h-m">Open source</span><p class="body">MIT licensed. The gesture code is about 100 lines and easy to read.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="install">
+    <div class="wrap install">
+      <div class="sec-head" style="margin:0">
+        <span class="mono">Install</span>
+        <h2 class="h-l">Three lines.<br>One log in.</h2>
+        <p class="lede">For Ubuntu 24.04 and newer. The installer sets everything up, then log out and back in once.</p>
+      </div>
+      <div class="code"><button class="copy" data-copy>COPY</button><span class="c"># get Orbit</span><br><span class="p">$</span> git clone https://github.com/jsticks779/orbit.git<br><span class="p">$</span> cd orbit<br><span class="p">$</span> ./setup.sh</div>
+    </div>
+  </section>
+
+  <section class="wrap final">
+    <img src="assets/orby.svg" alt="">
+    <h2 class="h-l">Give your files<br>an orbit.</h2>
+    <div class="ctas"><a class="pill" href="#install">Install on Ubuntu</a><a class="link" href="https://github.com/jsticks779/orbit">Star on GitHub</a></div>
+  </section>
+
+  <footer class="wrap footer">
+    <a class="logo" href="#" style="font-size:20px"><img src="assets/orby.svg" alt="" style="width:32px;height:32px">orbit</a>
+    <span class="mono">MIT licensed · made by jsticks779</span>
+    <a class="link" href="https://github.com/jsticks779/orbit">GitHub</a>
+  </footer>
+</main>
+
+<script>
+document.querySelectorAll("[data-copy]").forEach(function (btn) {
+  btn.addEventListener("click", function () {
+    var text = "git clone https://github.com/jsticks779/orbit.git\ncd orbit\n./setup.sh";
+    try {
+      navigator.clipboard.writeText(text).then(function () {
+        btn.textContent = "COPIED";
+        setTimeout(function () { btn.textContent = "COPY"; }, 1600);
+      });
+    } catch (e) { btn.textContent = "SELECT TEXT"; }
+  });
+});
+if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  document.querySelectorAll("video").forEach(function (v) { v.removeAttribute("autoplay"); v.pause(); });
+}
+</script>
+</body>
+</html>
