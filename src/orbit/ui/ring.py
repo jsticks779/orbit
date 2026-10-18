@@ -1,16 +1,17 @@
-"""The ring: a transparent fullscreen overlay with a radial menu.
+"""The Orbit panel: a compact floating glass card with a circle of actions.
 
-Modes:
-  * drop     - summoned by drag + Shift; the ring appears under the cursor
-               and the file is dropped on a slice.
-  * click    - opened for known files (`orbit ring FILE`, Files menu).
-  * progress - after a choice the ring shrinks into a progress circle that
-               fills at the real speed of the job, then shows ✓ or ✗.
-               The overlay is click-through while it runs.
+macOS / iOS inspired: a light or dark material card, an iOS segmented control
+(Convert / Tools), round buttons on an orbit, a live file preview in the middle
+and a one-line explanation at the bottom. After a choice the same card shows
+real progress, then a ✓ (with "Show in Files") or ✗.
+
+Wayland doesn't let apps place windows, so GNOME positions the card and the
+user drags the file onto it.
 """
 
 import logging
 import math
+import threading
 import time
 from pathlib import Path
 
@@ -21,34 +22,44 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Gdk", "4.0")
 gi.require_version("PangoCairo", "1.0")
 gi.require_version("GdkPixbuf", "2.0")
-from gi.repository import Gdk, GdkPixbuf, GLib, Gtk, Pango, PangoCairo  # noqa: E402
+gi.require_version("Adw", "1")
+from gi.repository import Adw, Gdk, GdkPixbuf, GLib, Gtk, Pango, PangoCairo  # noqa: E402
 
 from ..core.actions import Action, pages_for  # noqa: E402
 from ..core.portal import real_paths  # noqa: E402
+from .thumbs import thumbnail  # noqa: E402
 
 log = logging.getLogger("orbit")
 
-R_OUT, R_IN, R_HUB = 190, 80, 64     # outer edge, inner edge, centre hub
-RIM = 16                             # glass rim around the slices
-GAP = 8                              # space between slices (px)
-POP = 7                              # hovered slice moves outward (px)
-R_PROG = 54                          # progress circle radius
-DWELL_MS = 650                       # hover the hub this long to flip page
+W, H = 440, 556          # window size
+M = 22                   # transparent margin for the card shadow
+RADIUS = 30              # card corner radius
+CX, CY = W / 2, 268      # orbit centre
+ORBIT = 138              # orbit radius (button centres)
+SEG_Y = 58               # segmented control centre
 PAGE_NAMES = ["Convert", "Tools"]
 
-INK = (0.33, 0.18, 0.10)
-WHITE = (1, 1, 1)
-HOT_A, HOT_B = (1.0, 0.45, 0.25), (0.86, 0.20, 0.13)     # hovered slice gradient
-SLICE_A, SLICE_B = (1.0, 0.93, 0.87), (0.98, 0.80, 0.68)  # normal slice gradient
-OK_GREEN = (0.20, 0.72, 0.42)
-ERR_RED = (0.88, 0.22, 0.18)
+# "Aurora" palette: violet to cyan accent, Apple-style neutrals.
+ACCENT_A = (0.43, 0.36, 1.00)   # #6E5BFF
+ACCENT_B = (0.00, 0.76, 1.00)   # #00C2FF
+GREEN = (0.20, 0.78, 0.35)      # #34C759
+RED = (1.00, 0.27, 0.23)        # #FF453A
+THEMES = {
+    "light": dict(card=(0.98, 0.98, 0.99, 0.96), edge=(0, 0, 0, 0.08), fill=(0.46, 0.46, 0.50, 0.12),
+                  label=(0.11, 0.11, 0.12), secondary=(0.24, 0.24, 0.26, 0.62), seg_on=(1, 1, 1, 1),
+                  shadow=0.22, thumb_bg=(0.46, 0.46, 0.50, 0.10)),
+    "dark": dict(card=(0.12, 0.12, 0.13, 0.96), edge=(1, 1, 1, 0.10), fill=(0.46, 0.46, 0.50, 0.26),
+                 label=(0.96, 0.96, 0.97), secondary=(0.92, 0.92, 0.96, 0.60), seg_on=(0.39, 0.39, 0.40, 1),
+                 shadow=0.45, thumb_bg=(1, 1, 1, 0.06)),
+}
 
 
 def _ease(t):
     return 1 - (1 - t) ** 3
 
 
-def _rounded_rect(cr, x, y, w, h, r):
+def _rounded(cr, x, y, w, h, r):
+    r = min(r, w / 2, h / 2)
     cr.new_sub_path()
     cr.arc(x + w - r, y + r, r, -math.pi / 2, 0)
     cr.arc(x + w - r, y + h - r, r, 0, math.pi / 2)
@@ -57,37 +68,57 @@ def _rounded_rect(cr, x, y, w, h, r):
     cr.close_path()
 
 
+def _accent(x0, y0, x1, y1):
+    g = cairo.LinearGradient(x0, y0, x1, y1)
+    g.add_color_stop_rgb(0, *ACCENT_A)
+    g.add_color_stop_rgb(1, *ACCENT_B)
+    return g
+
+
 class RingWindow(Gtk.Window):
     def __init__(self, app, files: list[Path] | None = None, progress_only=False):
-        super().__init__(application=app, decorated=False, title="Orbit")
+        super().__init__(application=app, decorated=False, resizable=False, title="Orbit",
+                         default_width=W, default_height=H)
         self.app = app
         self.add_css_class("orbit-overlay")
-        self.files: list[Path] = list(files or [])
+        self.files: list[Path] = []
         self.click_mode = bool(files)
-        self.pages: list[list[Action]] = pages_for(self.files) if self.files else []
+        self.pages: list[list[Action]] = []
         self.page = 0
-        self.center = None            # (x, y) once placed
-        self.hover = None             # slice index, "hub" or None
-        self.appear = 0.0             # 0..1 entrance animation
-        self.flip = 1.0               # 0..1 page-change animation
-        self.mode = "menu"            # menu | progress | done | error
-        self.morph = 0.0              # 0..1 menu -> progress circle
+        self.hover = None              # ("btn", i) | ("seg", i) | ("close",) | ("show",) | None
+        self.scales = {}               # button index -> current scale (hover animation)
+        self.appear = 0.0
+        self.flip = 1.0
+        self.mode = "menu"             # menu | progress | done | error
+        self.morph = 0.0
         self.target = self.shown = 0.0
         self.reported = False
         self.job_label = self.result_text = ""
+        self.outputs: list[Path] = []
         self.fade = 1.0
+        self.thumb = None
         self._t0 = 0.0
-        self._dwell = None
+        self._seg_timer = None
         self._close_timer = None
-        self._entered = False
-        self._over = False            # a drag is currently hovering the overlay
+        self._entered = self._over = False
         self._ticking = False
         self._icons = {}
+        self.theme = THEMES["dark" if Adw.StyleManager.get_default().get_dark() else "light"]
 
-        self.area = Gtk.DrawingArea(hexpand=True, vexpand=True)
+        self.area = Gtk.DrawingArea(content_width=W, content_height=H)
         self.area.set_draw_func(self._draw)
         self.set_child(self.area)
 
+        motion = Gtk.EventControllerMotion()
+        motion.connect("motion", lambda _c, x, y: self._hover_at(x, y))
+        motion.connect("leave", lambda *_: self._hover_at(-1, -1))
+        self.area.add_controller(motion)
+        click = Gtk.GestureClick()
+        click.connect("released", self._on_click)
+        self.area.add_controller(click)
+        keys = Gtk.EventControllerKey()
+        keys.connect("key-pressed", self._on_key)
+        self.add_controller(keys)
         if not progress_only:
             drop = Gtk.DropTarget.new(Gdk.FileList, Gdk.DragAction.COPY)
             drop.set_preload(True)
@@ -97,26 +128,16 @@ class RingWindow(Gtk.Window):
             drop.connect("drop", self._on_drop)
             drop.connect("notify::value", self._on_value)
             self.area.add_controller(drop)
-            motion = Gtk.EventControllerMotion()
-            motion.connect("motion", lambda _c, x, y: self._hover_at(x, y) if self.click_mode else None)
-            self.area.add_controller(motion)
-            click = Gtk.GestureClick()
-            click.connect("released", self._on_click)
-            self.area.add_controller(click)
-            keys = Gtk.EventControllerKey()
-            keys.connect("key-pressed", self._on_key)
-            self.add_controller(keys)
-
-        self.fullscreen()
+        if files:
+            self._set_files(files)
 
     # ---- lifecycle ----------------------------------------------------------------
 
     def show_ring(self, timeout_s=None):
         self.present()
-        if self.click_mode:
-            GLib.idle_add(self._place_middle)
-        # Shift pressed without a real drag (e.g. finger resting on the touchpad)? Close fast.
-        ms = timeout_s * 1000 if timeout_s else (8000 if self.click_mode else 2500)
+        self._tick()
+        # Nothing dragged onto the card? Get out of the way.
+        ms = timeout_s * 1000 if timeout_s else (30000 if self.click_mode else 8000)
         self._close_timer = GLib.timeout_add(ms, self._timeout)
 
     def _timeout(self):
@@ -125,51 +146,9 @@ class RingWindow(Gtk.Window):
             self.close()
         return False
 
-    def _place_middle(self):
-        self._place(self.get_width() / 2, self.get_height() / 2)
-        return False
-
-    def _place(self, x, y):
-        if self.center:
-            return
-        w, h = max(self.get_width(), 2 * R_OUT), max(self.get_height(), 2 * R_OUT)
-        m = R_OUT + RIM + 12
-        self.center = (min(max(x, m), w - m), min(max(y, m), h - m - 70))
-        self.appear = 0.0
-        self._tick()
-
-    def _tick(self):
-        if not self._ticking:
-            self._ticking = True
-            self.add_tick_callback(self._animate)
-
-    def _animate(self, _widget, _clock):
-        busy = False
-        step = 1 / 9
-        if self.appear < 1:
-            self.appear = min(1.0, self.appear + step)
-            busy = True
-        if self.flip < 1:
-            self.flip = min(1.0, self.flip + step)
-            busy = True
-        if self.mode != "menu":
-            if self.morph < 1:
-                self.morph = min(1.0, self.morph + 1 / 12)
-            if self.mode == "progress" and not self.reported:
-                # No numbers from the job yet: creep towards 90% so it never looks frozen.
-                elapsed = time.monotonic() - self._t0
-                self.target = max(self.target, 0.9 * (1 - math.exp(-elapsed / 3.0)))
-            self.shown += (self.target - self.shown) * 0.18
-            busy = True
-        self.area.queue_draw()
-        if not busy:
-            self._ticking = False
-        return busy
-
     def released(self):
-        """Button/finger went up. Touchpad tap-and-drag lifts the finger mid-drag,
-        so only close if no drag is hovering the ring any more."""
-        GLib.timeout_add(350, lambda: (self._close_if_idle(), False)[1])
+        """Mouse button / finger went up. If the drag isn't over the card, it ended elsewhere."""
+        GLib.timeout_add(700, lambda: (self._close_if_idle(), False)[1])
 
     def _close_if_idle(self):
         if not self._over and not self.click_mode and self.mode == "menu":
@@ -177,23 +156,74 @@ class RingWindow(Gtk.Window):
 
     def next_page(self):
         if len(self.pages) > 1 and self.mode == "menu":
-            self.page = (self.page + 1) % len(self.pages)
+            self._go_page((self.page + 1) % len(self.pages))
+
+    def _go_page(self, n):
+        if n != self.page:
+            self.page = n
             self.flip = 0.0
+            self.scales.clear()
             self._tick()
+
+    def _set_files(self, files):
+        if files == self.files:
+            return
+        self.files = files
+        self.pages = pages_for(files)
+        self.page = 0
+        self.thumb = None
+        first = files[0]
+
+        def load():
+            surf = thumbnail(first)
+            GLib.idle_add(lambda: (setattr(self, "thumb", surf), self.area.queue_draw(), False)[2])
+        threading.Thread(target=load, daemon=True).start()
+        self.area.queue_draw()
+
+    # ---- animation ----------------------------------------------------------------
+
+    def _tick(self):
+        if not self._ticking:
+            self._ticking = True
+            self.add_tick_callback(self._animate)
+
+    def _animate(self, *_):
+        busy = False
+        if self.appear < 1:
+            self.appear = min(1.0, self.appear + 1 / 10)
+            busy = True
+        if self.flip < 1:
+            self.flip = min(1.0, self.flip + 1 / 9)
+            busy = True
+        for i in list(self.scales) + [h for h in [self._hover_btn()] if h is not None]:
+            want = 1.14 if self._hover_btn() == i else 1.0
+            cur = self.scales.get(i, 1.0)
+            if abs(want - cur) > 0.002:
+                self.scales[i] = cur + (want - cur) * 0.3
+                busy = True
+        if self.mode != "menu":
+            if self.morph < 1:
+                self.morph = min(1.0, self.morph + 1 / 12)
+            if self.mode == "progress" and not self.reported:
+                # No numbers from the job yet: creep towards 90% so it never looks frozen.
+                elapsed = time.monotonic() - self._t0
+                self.target = max(self.target, 0.9 * (1 - math.exp(-elapsed / 3.0)))
+            if abs(self.target - self.shown) > 0.001 or self.mode == "progress":
+                self.shown += (self.target - self.shown) * 0.18
+                busy = True
+            busy = busy or self.morph < 1
+        self.area.queue_draw()
+        if not busy:
+            self._ticking = False
+        return busy
 
     # ---- progress -----------------------------------------------------------------
 
     def start_progress(self, label: str):
-        """Turn the ring into a progress circle and let clicks pass through."""
         self.mode = "progress"
         self.job_label = label
         self.target = self.shown = 0.0
         self._t0 = time.monotonic()
-        if not self.center:
-            self._place_middle()
-        surface = self.get_surface()
-        if surface:
-            surface.set_input_region(cairo.Region())
         self._tick()
 
     def set_progress(self, fraction: float):
@@ -201,13 +231,14 @@ class RingWindow(Gtk.Window):
         self.target = max(self.target, fraction)
         self._tick()
 
-    def finish(self, ok: bool, text: str):
+    def finish(self, ok: bool, text: str, outputs=()):
         self.mode = "done" if ok else "error"
         self.result_text = text
+        self.outputs = list(outputs)
         if ok:
             self.target = 1.0
         self._tick()
-        GLib.timeout_add(1500 if ok else 3500, self._fade_out)
+        GLib.timeout_add(3500 if ok else 4500, self._fade_out)
 
     def _fade_out(self):
         def step():
@@ -217,107 +248,121 @@ class RingWindow(Gtk.Window):
                 self.close()
                 return False
             return True
+        if self.hover == ("show",):  # don't vanish under the pointer
+            return True
         GLib.timeout_add(16, step)
         return False
 
-    # ---- geometry -----------------------------------------------------------------
+    # ---- layout / hit testing -----------------------------------------------------
 
     @property
     def actions(self) -> list[Action]:
         return self.pages[self.page] if self.pages else []
 
+    def _btn_radius(self):
+        return 30 if len(self.actions) <= 8 else 27
+
+    def _btn_pos(self, i):
+        n = max(len(self.actions), 1)
+        a = -math.pi / 2 + i * 2 * math.pi / n
+        return CX + ORBIT * math.cos(a), CY + ORBIT * math.sin(a)
+
+    def _seg_rects(self):
+        n = len(self.pages)
+        w = 104
+        x0 = CX - n * w / 2
+        return [(x0 + i * w, SEG_Y - 15, w, 30) for i in range(n)]
+
     def _hit(self, x, y):
-        if not self.center or self.mode != "menu":
+        if math.hypot(x - (M + 22), y - (M + 22)) <= 9:
+            return ("close",)
+        if self.mode == "done" and self.outputs:
+            bx, by, bw, bh = self._show_rect()
+            if bx <= x <= bx + bw and by <= y <= by + bh:
+                return ("show",)
+        if self.mode != "menu":
             return None
-        dx, dy = x - self.center[0], y - self.center[1]
-        r = math.hypot(dx, dy)
-        if r <= R_HUB:
-            return "hub"
-        if not (R_IN - 6 <= r <= R_OUT + RIM + 24) or not self.actions:
-            return None
-        n = len(self.actions)
-        ang = (math.atan2(dy, dx) + math.pi / 2 + math.pi / n) % (2 * math.pi)
-        return int(ang / (2 * math.pi / n)) % n
+        if len(self.pages) > 1:
+            for i, (sx, sy, sw, sh) in enumerate(self._seg_rects()):
+                if sx <= x <= sx + sw and sy <= y <= sy + sh:
+                    return ("seg", i)
+        r = self._btn_radius() + 8
+        for i in range(len(self.actions)):
+            bx, by = self._btn_pos(i)
+            if math.hypot(x - bx, y - by) <= r:
+                return ("btn", i)
+        return None
+
+    def _hover_btn(self):
+        return self.hover[1] if self.hover and self.hover[0] == "btn" else None
 
     def _hover_at(self, x, y):
         hit = self._hit(x, y)
-        if hit != self.hover:
-            self.hover = hit
-            if self._dwell:
-                GLib.source_remove(self._dwell)
-                self._dwell = None
-            if hit == "hub" and len(self.pages) > 1:
-                self._dwell = GLib.timeout_add(DWELL_MS, self._dwell_flip)
-            self.area.queue_draw()
+        if hit == self.hover:
+            return
+        self.hover = hit
+        if self._seg_timer:
+            GLib.source_remove(self._seg_timer)
+            self._seg_timer = None
+        if hit and hit[0] == "seg":  # resting on a segment switches to it, even mid-drag
+            self._seg_timer = GLib.timeout_add(250, lambda: (self._go_page(hit[1]), False)[1])
+        self._tick()
 
-    def _dwell_flip(self):
-        self._dwell = None
-        self.next_page()
-        return False
-
-    # ---- drag and drop ------------------------------------------------------------
+    # ---- input --------------------------------------------------------------------
 
     def _files_from(self, value):
         return real_paths([f.get_path() for f in value.get_files() if f.get_path()])
 
     def _on_enter(self, _t, x, y):
-        log.info("drag entered ring at %.0f,%.0f", x, y)
+        log.info("drag entered the panel")
         self._entered = self._over = True
-        # GNOME reports (0, 0) when a drag enters a freshly opened window;
-        # wait for the first real motion to place the ring under the cursor.
-        if x or y:
-            self._place(x, y)
         return Gdk.DragAction.COPY
 
     def _on_value(self, target, _pspec):
         value = target.get_value()
-        if value is None:
-            return
-        files = self._files_from(value)
-        if files and files != self.files:
-            self.files = files
-            self.pages = pages_for(files)
-            self.page = 0
-            self.area.queue_draw()
+        if value is not None:
+            files = self._files_from(value)
+            if files:
+                self._set_files(files)
 
     def _on_motion(self, _t, x, y):
         self._over = True
-        self._place(x, y)
         self._hover_at(x, y)
         return Gdk.DragAction.COPY
 
     def _on_leave(self, _t):
-        # The overlay covers the screen, so leaving means the drag ended or was cancelled.
         self._over = False
-        self.hover = None
-        self.area.queue_draw()
-        GLib.timeout_add(400, lambda: (self._close_if_idle(), False)[1])
+        self._hover_at(-1, -1)
 
     def _on_drop(self, _t, value, x, y):
         self._over = False
-        self.files = self._files_from(value) or self.files
-        if not self.pages:
-            self.pages = pages_for(self.files)
+        self._set_files(self._files_from(value) or self.files)
         hit = self._hit(x, y)
-        if isinstance(hit, int) and hit < len(self.actions):
-            self._choose(self.actions[hit])
+        if hit and hit[0] == "btn" and hit[1] < len(self.actions):
+            self._choose(self.actions[hit[1]])
+        elif hit and hit[0] == "seg":
+            self._go_page(hit[1])
+            return False
         else:
-            self.close()
+            return False  # dropped on empty space: keep the card open
         return True
 
     def _on_click(self, _g, _n, x, y):
-        if self.mode != "menu":
-            return
         hit = self._hit(x, y)
-        if hit == "hub":
-            self.next_page()
-        elif isinstance(hit, int) and hit < len(self.actions):
-            self._choose(self.actions[hit])
-        else:
+        if not hit:
+            return
+        if hit[0] == "close":
             self.close()
+        elif hit[0] == "show":
+            self.app.show_in_files(self.outputs[0])
+            self.close()
+        elif hit[0] == "seg":
+            self._go_page(hit[1])
+        elif hit[0] == "btn" and self.files:
+            self._choose(self.actions[hit[1]])
 
     def _on_key(self, _c, keyval, *_):
-        if keyval == Gdk.KEY_Escape and self.mode == "menu":
+        if keyval == Gdk.KEY_Escape:
             self.close()
         elif keyval in (Gdk.KEY_Shift_L, Gdk.KEY_Shift_R, Gdk.KEY_Tab):
             self.next_page()
@@ -330,202 +375,239 @@ class RingWindow(Gtk.Window):
         self.app.perform(action, files, ring=None if action.dialog else self)
 
     def do_close_request(self):
-        for src in (self._dwell, self._close_timer):
+        for src in (self._seg_timer, self._close_timer):
             if src:
                 GLib.source_remove(src)
-        self._dwell = self._close_timer = None
+        self._seg_timer = self._close_timer = None
         return False
 
     # ---- drawing ------------------------------------------------------------------
 
-    def _draw(self, _area, cr: cairo.Context, w, h):
-        if not self.center:
-            return
-        cx, cy = self.center
-        cr.save()
-        cr.translate(cx, cy)
+    def _draw(self, _a, cr: cairo.Context, w, h):
+        t = self.theme
+        a = _ease(self.appear) * max(0.0, self.fade)
         cr.push_group()
-        if self.mode == "menu" or self.morph < 1:
-            cr.save()
-            s = (0.6 + 0.4 * _ease(self.appear)) * (1 - 0.6 * _ease(self.morph))
-            cr.scale(s, s)
+        s = 0.94 + 0.06 * _ease(self.appear)
+        cr.translate(W / 2, H / 2)
+        cr.scale(s, s)
+        cr.translate(-W / 2, -H / 2)
+
+        # Card with layered soft shadow (macOS style).
+        for i, (grow, alpha) in enumerate(((14, 0.25), (8, 0.35), (3, 0.4))):
+            _rounded(cr, M - grow / 2, M + grow / 3, W - 2 * M + grow, H - 2 * M + grow / 2, RADIUS + grow / 2)
+            cr.set_source_rgba(0, 0, 0, t["shadow"] * alpha * 0.35)
+            cr.fill()
+        _rounded(cr, M, M, W - 2 * M, H - 2 * M, RADIUS)
+        cr.set_source_rgba(*t["card"])
+        cr.fill_preserve()
+        cr.set_source_rgba(*t["edge"])
+        cr.set_line_width(1)
+        cr.stroke()
+
+        self._close_dot(cr)
+        menu_alpha = 1 - _ease(self.morph)
+        if menu_alpha > 0.01:
             cr.push_group()
             self._draw_menu(cr)
             cr.pop_group_to_source()
-            cr.paint_with_alpha(_ease(self.appear) * (0.4 + 0.6 * _ease(self.flip)) * (1 - _ease(self.morph)))
-            cr.restore()
+            cr.paint_with_alpha(menu_alpha)
+        self._draw_centre(cr)
         if self.mode != "menu":
             cr.push_group()
-            self._draw_progress(cr)
+            self._draw_status(cr)
             cr.pop_group_to_source()
             cr.paint_with_alpha(_ease(self.morph))
+
         cr.pop_group_to_source()
-        cr.paint_with_alpha(max(0.0, self.fade))
-        cr.restore()
+        cr.paint_with_alpha(a)
+
+    def _close_dot(self, cr):
+        x, y = M + 22, M + 22
+        cr.new_path()
+        cr.arc(x, y, 6.5, 0, 2 * math.pi)
+        cr.set_source_rgb(1.0, 0.37, 0.34)
+        cr.fill()
+        if self.hover == ("close",):
+            cr.set_source_rgba(0.35, 0.05, 0.03, 0.8)
+            cr.set_line_width(1.4)
+            for d in ((-2.5, -2.5, 2.5, 2.5), (2.5, -2.5, -2.5, 2.5)):
+                cr.move_to(x + d[0], y + d[1])
+                cr.line_to(x + d[2], y + d[3])
+            cr.stroke()
 
     def _draw_menu(self, cr):
-        # Soft shadow under the whole ring.
-        shadow = cairo.RadialGradient(0, 14, R_OUT * 0.6, 0, 14, R_OUT + RIM + 34)
-        shadow.add_color_stop_rgba(0, 0, 0, 0, 0.28)
-        shadow.add_color_stop_rgba(1, 0, 0, 0, 0)
-        cr.arc(0, 14, R_OUT + RIM + 34, 0, 2 * math.pi)
-        cr.set_source(shadow)
-        cr.fill()
-
-        # Frosted glass rim: bright at the top, softer below.
-        glass = cairo.LinearGradient(0, -R_OUT - RIM, 0, R_OUT + RIM)
-        glass.add_color_stop_rgba(0, 1, 1, 1, 0.62)
-        glass.add_color_stop_rgba(1, 1, 0.92, 0.86, 0.38)
-        cr.arc(0, 0, R_OUT + RIM, 0, 2 * math.pi)
-        cr.set_source(glass)
-        cr.fill_preserve()
-        cr.set_source_rgba(1, 1, 1, 0.8)
-        cr.set_line_width(1.2)
-        cr.stroke()
-        cr.new_path()
-        cr.arc(0, 0, R_OUT + RIM - 3, math.pi * 1.15, math.pi * 1.85)  # top highlight
-        cr.set_source_rgba(1, 1, 1, 0.75)
-        cr.set_line_width(2)
-        cr.stroke()
-
-        acts = self.actions
-        n = max(len(acts), 1)
-        spin = (1 - _ease(self.flip)) * (math.pi / 3)
-        for i, act in enumerate(acts):
-            mid = -math.pi / 2 + i * 2 * math.pi / n - spin
-            self._slice(cr, mid, 2 * math.pi / n, act, hot=(self.hover == i))
-
-        self._hub(cr)
-        self._hint(cr)
-
-    def _slice(self, cr, mid, span, act, hot):
-        cr.save()
-        if hot:
-            cr.translate(POP * math.cos(mid), POP * math.sin(mid))
-        full = span >= 2 * math.pi - 0.01
-        r_out, r_in = R_OUT - 5, R_IN + 5
-        inset_o = 0 if full else (GAP / 2 + 5) / r_out
-        inset_i = 0 if full else (GAP / 2 + 5) / r_in
-        a0, a1 = mid - span / 2, mid + span / 2
-        cr.new_path()
-        cr.arc(0, 0, r_out, a0 + inset_o, a1 - inset_o)
-        cr.arc_negative(0, 0, r_in, a1 - inset_i, a0 + inset_i)
-        cr.close_path()
-        a, b = (HOT_A, HOT_B) if hot else (SLICE_A, SLICE_B)
-        grad = cairo.LinearGradient(0, -R_OUT, 0, R_OUT)
-        grad.add_color_stop_rgba(0, *a, 0.97)
-        grad.add_color_stop_rgba(1, *b, 0.97)
-        cr.set_source(grad)
-        cr.set_line_join(cairo.LINE_JOIN_ROUND)
-        cr.set_line_width(10)  # thick round stroke = soft rounded corners
-        cr.fill_preserve()
-        cr.stroke()
-
-        rm = (R_OUT + R_IN) / 2 + 3
-        x, y = rm * math.cos(mid), rm * math.sin(mid)
-        ink = WHITE if hot else INK
-        size = 10.5 if len(act.label) <= 6 else 9
-        if act.icon and self._paint_icon(cr, act.icon, x - 10, y - 22, ink):
-            self._text(cr, act.label.upper(), x, y + 10, ink, size=8.5, bold=True, spacing=0.6)
+        t = self.theme
+        # iOS segmented control.
+        if len(self.pages) > 1:
+            rects = self._seg_rects()
+            x0, y0 = rects[0][0], rects[0][1]
+            _rounded(cr, x0 - 2, y0 - 2, sum(r[2] for r in rects) + 4, 34, 10)
+            cr.set_source_rgba(*t["fill"])
+            cr.fill()
+            sx, sy, sw, sh = rects[self.page]
+            _rounded(cr, sx + 1, sy + 1, sw - 2, sh - 2, 8)
+            cr.set_source_rgba(0, 0, 0, 0.10)
+            cr.fill()
+            _rounded(cr, sx + 1, sy, sw - 2, sh - 2, 8)
+            cr.set_source_rgba(*t["seg_on"])
+            cr.fill()
+            for i, (rx, ry, rw, rh) in enumerate(rects):
+                self._text(cr, PAGE_NAMES[i], rx + rw / 2, SEG_Y, t["label"], 10, bold=(i == self.page))
         else:
-            self._text(cr, act.label.upper(), x, y, ink, size=size, bold=True, spacing=0.6)
+            self._text(cr, "Orbit", CX, SEG_Y, t["label"], 11, bold=True)
+
+        # Buttons on the orbit (they swing in when the page changes).
+        spin = (1 - _ease(self.flip)) * 0.5
+        cr.save()
+        cr.translate(CX, CY)
+        cr.rotate(-spin)
+        cr.translate(-CX, -CY)
+        alpha = 0.3 + 0.7 * _ease(self.flip)
+        for i, act in enumerate(self.actions):
+            cr.push_group()
+            self._button(cr, i, act)
+            cr.pop_group_to_source()
+            cr.paint_with_alpha(alpha)
         cr.restore()
 
-    def _hub(self, cr):
-        hot = self.hover == "hub"
-        cr.new_path()  # don't connect to the last text position
-        cr.arc(0, 0, R_HUB, 0, 2 * math.pi)
-        g = cairo.RadialGradient(0, -20, 4, 0, 0, R_HUB)
-        g.add_color_stop_rgba(0, 1, 1, 1, 0.98)
-        g.add_color_stop_rgba(1, 1, 0.95, 0.91, 0.92 if hot else 0.85)
-        cr.set_source(g)
-        cr.fill_preserve()
-        cr.set_source_rgba(1, 1, 1, 0.9)
-        cr.set_line_width(1.2)
-        cr.stroke()
-        if isinstance(self.hover, int) and self.hover < len(self.actions):
-            self._text(cr, self.actions[self.hover].label, 0, -7, INK, size=12.5, bold=True)
-            self._pill(cr, self._size_text(), 0, 15, size=8.5)
+        # Explanation line.
+        hb = self._hover_btn()
+        if hb is not None and hb < len(self.actions):
+            act = self.actions[hb]
+            self._text(cr, act.label, CX, H - M - 58, t["label"], 11.5, bold=True)
+            self._text(cr, act.hint, CX, H - M - 36, t["secondary"], 9.5, width=W - 2 * M - 40)
         elif self.files:
+            other = PAGE_NAMES[(self.page + 1) % 2] if len(self.pages) > 1 else ""
+            self._text(cr, "Drop on an action", CX, H - M - 58, t["label"], 11.5, bold=True)
+            self._text(cr, f"Tap Shift or rest on the switch for {other}" if other else "",
+                       CX, H - M - 36, t["secondary"], 9.5)
+        else:
+            self._text(cr, "Drag your file here", CX, H - M - 58, t["label"], 11.5, bold=True)
+            self._text(cr, "Then drop it on what you want to do", CX, H - M - 36, t["secondary"], 9.5)
+
+    def _button(self, cr, i, act):
+        t = self.theme
+        x, y = self._btn_pos(i)
+        r = self._btn_radius() * self.scales.get(i, 1.0)
+        hot = self._hover_btn() == i
+        cr.new_path()
+        if hot:  # glow
+            glow = cairo.RadialGradient(x, y + 4, r * 0.6, x, y + 4, r + 14)
+            glow.add_color_stop_rgba(0, *ACCENT_A, 0.35)
+            glow.add_color_stop_rgba(1, *ACCENT_A, 0)
+            cr.arc(x, y + 4, r + 14, 0, 2 * math.pi)
+            cr.set_source(glow)
+            cr.fill()
+        cr.arc(x, y, r, 0, 2 * math.pi)
+        cr.set_source(_accent(x - r, y - r, x + r, y + r)) if hot else cr.set_source_rgba(*t["fill"])
+        cr.fill()
+        ink = (1, 1, 1) if hot else t["label"]
+        if act.icon and self._paint_icon(cr, act.icon, x - 10, y - 10, ink):
+            self._text(cr, act.label, x, y + r + 12, t["label"] if not hot else ACCENT_A, 8.5, bold=hot)
+        else:
+            size = 10.5 if len(act.label) <= 4 else 8.5
+            self._text(cr, act.label, x, y, ink, size, bold=True)
+
+    def _draw_centre(self, cr):
+        """File preview, or the progress ring around it."""
+        t = self.theme
+        busy = self.mode != "menu"
+        tw = 92
+        tx, ty = CX - tw / 2, CY - tw / 2 - (14 if not busy else 0)
+        _rounded(cr, tx, ty, tw, tw, 20)
+        cr.set_source_rgba(*t["thumb_bg"])
+        cr.fill()
+        if self.thumb:
+            sw, sh = self.thumb.get_width(), self.thumb.get_height()
+            k = min((tw - 12) / sw, (tw - 12) / sh)
+            cr.save()
+            _rounded(cr, tx, ty, tw, tw, 20)
+            cr.clip()
+            cr.translate(CX - sw * k / 2, ty + tw / 2 - sh * k / 2)
+            cr.scale(k, k)
+            cr.set_source_surface(self.thumb, 0, 0)
+            cr.paint()
+            cr.restore()
+        elif self.files:
+            ext = self.files[0].suffix.lstrip(".").upper()[:4] or "FILE"
+            self._paint_icon(cr, "text-x-generic-symbolic", CX - 16, ty + 18, t["secondary"][:3], 32)
+            self._text(cr, ext, CX, ty + tw - 22, t["secondary"][:3], 10, bold=True)
+        else:
+            self._paint_icon(cr, "go-down-symbolic", CX - 16, ty + tw / 2 - 16, t["secondary"][:3], 32)
+
+        if not busy and self.files:
             name = self.files[0].name if len(self.files) == 1 else f"{len(self.files)} files"
-            self._text(cr, name if len(name) < 15 else name[:13] + "…", 0, -7, INK, size=9.5, bold=True)
-            self._pill(cr, self._size_text(), 0, 15, size=8.5)
-        else:
-            self._text(cr, "Orbit", 0, 0, INK, size=13, bold=True)
+            self._text(cr, name, CX, ty + tw + 16, t["label"], 9.5, bold=True, width=150)
+            self._text(cr, self._size_text(), CX, ty + tw + 32, t["secondary"], 8.5)
 
-    def _hint(self, cr):
-        """The explanation pill under the ring, plus page dots."""
-        y = R_OUT + RIM + 30
-        if isinstance(self.hover, int) and self.hover < len(self.actions):
-            text = self.actions[self.hover].hint or self.actions[self.hover].label
-        elif len(self.pages) > 1:
-            other = PAGE_NAMES[(self.page + 1) % len(self.pages)]
-            text = f"Tap Shift or rest on the centre for {other}"
-        else:
-            text = "Drop on a slice"
-        self._pill(cr, text, 0, y, size=10, dark=True, pad=14)
-        if len(self.pages) > 1:
-            for i in range(len(self.pages)):
-                x = (i - (len(self.pages) - 1) / 2) * 14
+        if busy:  # progress ring hugging the preview
+            pr = 64
+            k = _ease(self.morph)
+            cr.set_line_width(6)
+            cr.set_line_cap(cairo.LINE_CAP_ROUND)
+            cr.new_path()
+            cr.arc(CX, CY, pr, 0, 2 * math.pi)
+            cr.set_source_rgba(*t["fill"][:3], t["fill"][3] * k)
+            cr.stroke()
+            frac = min(1.0, self.shown)
+            if frac > 0.003 or self.mode == "error":
                 cr.new_path()
-                cr.arc(x, y + 30, 3.5 if i != self.page else 4.5, 0, 2 * math.pi)
-                cr.set_source_rgba(1, 1, 1, 0.95 if i == self.page else 0.5)
-                cr.fill()
+                cr.arc(CX, CY, pr, -math.pi / 2, -math.pi / 2 + 2 * math.pi * (1 if self.mode == "error" else frac))
+                if self.mode == "error":
+                    cr.set_source_rgb(*RED)
+                elif self.mode == "done" and frac > 0.99:
+                    cr.set_source_rgb(*GREEN)
+                else:
+                    cr.set_source(_accent(CX - pr, CY - pr, CX + pr, CY + pr))
+                cr.stroke()
+            if self.mode in ("done", "error") and (frac > 0.99 or self.mode == "error"):
+                self._badge(cr, CX + 44, CY + 44, ok=self.mode == "done")
 
-    def _draw_progress(self, cr):
-        # Glass disc with a track and a glowing arc.
-        shadow = cairo.RadialGradient(0, 8, R_PROG * 0.6, 0, 8, R_PROG + 28)
-        shadow.add_color_stop_rgba(0, 0, 0, 0, 0.3)
-        shadow.add_color_stop_rgba(1, 0, 0, 0, 0)
-        cr.arc(0, 8, R_PROG + 28, 0, 2 * math.pi)
-        cr.set_source(shadow)
+    def _badge(self, cr, x, y, ok):
+        cr.new_path()
+        cr.arc(x, y, 15, 0, 2 * math.pi)
+        cr.set_source_rgba(*self.theme["card"][:3], 1)
         cr.fill()
-        cr.arc(0, 0, R_PROG + 10, 0, 2 * math.pi)
-        g = cairo.LinearGradient(0, -R_PROG, 0, R_PROG)
-        g.add_color_stop_rgba(0, 1, 1, 1, 0.95)
-        g.add_color_stop_rgba(1, 1, 0.93, 0.88, 0.9)
-        cr.set_source(g)
+        cr.arc(x, y, 12, 0, 2 * math.pi)
+        cr.set_source_rgb(*(GREEN if ok else RED))
         cr.fill()
-
-        cr.set_line_width(8)
+        cr.set_source_rgb(1, 1, 1)
+        cr.set_line_width(2.6)
         cr.set_line_cap(cairo.LINE_CAP_ROUND)
-        cr.arc(0, 0, R_PROG - 4, 0, 2 * math.pi)
-        cr.set_source_rgba(0.95, 0.80, 0.70, 0.6)
-        cr.stroke()
-        frac = min(1.0, self.shown)
-        finished = self.mode == "done" and frac > 0.99
-        if frac > 0.002 or self.mode == "error":
-            end = -math.pi / 2 + 2 * math.pi * (1.0 if self.mode == "error" else frac)
-            cr.arc(0, 0, R_PROG - 4, -math.pi / 2, end)
-            if finished or self.mode == "error":
-                cr.set_source_rgb(*(OK_GREEN if finished else ERR_RED))
-            else:
-                arc = cairo.LinearGradient(-R_PROG, -R_PROG, R_PROG, R_PROG)
-                arc.add_color_stop_rgb(0, *HOT_A)
-                arc.add_color_stop_rgb(1, *HOT_B)
-                cr.set_source(arc)
-            cr.stroke()
-
-        cr.set_line_width(6)
-        if finished:
-            cr.move_to(-16, 1)
-            cr.line_to(-5, 12)
-            cr.line_to(17, -12)
-            cr.set_source_rgb(*OK_GREEN)
-            cr.stroke()
-        elif self.mode == "error":
-            for a, b in (((-12, -12), (12, 12)), ((12, -12), (-12, 12))):
-                cr.move_to(*a)
-                cr.line_to(*b)
-            cr.set_source_rgb(*ERR_RED)
-            cr.stroke()
+        if ok:
+            cr.move_to(x - 5, y)
+            cr.line_to(x - 1.5, y + 4)
+            cr.line_to(x + 5.5, y - 4)
         else:
-            self._text(cr, f"{int(frac * 100)}%", 0, 0, INK, size=15, bold=True)
+            cr.move_to(x - 4, y - 4)
+            cr.line_to(x + 4, y + 4)
+            cr.move_to(x + 4, y - 4)
+            cr.line_to(x - 4, y + 4)
+        cr.stroke()
 
-        text = self.result_text if self.mode in ("done", "error") else f"{self.job_label}…"
-        self._pill(cr, text, 0, R_PROG + 36, size=10, dark=True, pad=14)
+    def _show_rect(self):
+        return (CX - 70, H - M - 62, 140, 34)
 
-    # ---- small drawing helpers ------------------------------------------------------
+    def _draw_status(self, cr):
+        t = self.theme
+        if self.mode == "progress":
+            self._text(cr, f"{self.job_label}", CX, SEG_Y, t["label"], 12, bold=True)
+            self._text(cr, f"{int(min(1, self.shown) * 100)}%", CX, CY + 98, t["label"], 20, bold=True)
+            self._text(cr, "Working on it…", CX, CY + 124, t["secondary"], 9.5)
+        elif self.mode == "done":
+            self._text(cr, "Saved", CX, SEG_Y, t["label"], 12, bold=True)
+            self._text(cr, self.result_text, CX, CY + 100, t["label"], 10.5, bold=True, width=W - 2 * M - 40)
+            if self.outputs:
+                x, y, w, h = self._show_rect()
+                _rounded(cr, x, y, w, h, h / 2)
+                cr.set_source(_accent(x, y, x + w, y + h))
+                cr.fill()
+                self._text(cr, "Show in Files", CX, y + h / 2, (1, 1, 1), 10, bold=True)
+        else:
+            self._text(cr, "Couldn't finish", CX, SEG_Y, t["label"], 12, bold=True)
+            self._text(cr, self.result_text, CX, CY + 104, t["secondary"], 9.5, width=W - 2 * M - 40)
+
+    # ---- helpers ------------------------------------------------------------------
 
     def _size_text(self):
         try:
@@ -537,61 +619,47 @@ class RingWindow(Gtk.Window):
                 return f"{size:.0f} {unit}" if unit == "B" else f"{size:.1f} {unit}"
             size /= 1024
 
-    def _layout(self, cr, text, size, bold, spacing=0.0):
-        layout = PangoCairo.create_layout(cr)
-        font = Pango.FontDescription.from_string(f"Inter, Cantarell, Sans {'Bold' if bold else ''} {size}")
-        layout.set_font_description(font)
-        if spacing:
-            attrs = Pango.AttrList()
-            attrs.insert(Pango.attr_letter_spacing_new(int(spacing * Pango.SCALE)))
-            layout.set_attributes(attrs)
-        layout.set_text(text, -1)
-        return layout
-
-    def _text(self, cr, text, x, y, rgb, size=10, bold=False, spacing=0.0):
-        layout = self._layout(cr, text, size, bold, spacing)
-        tw, th = layout.get_pixel_size()
-        cr.move_to(x - tw / 2, y - th / 2)
-        cr.set_source_rgb(*rgb)
-        PangoCairo.show_layout(cr, layout)
-
-    def _pill(self, cr, text, x, y, size=9, dark=False, pad=8):
+    def _text(self, cr, text, x, y, rgb, size=10, bold=False, width=None):
         if not text:
             return
-        layout = self._layout(cr, text, size, dark)
+        layout = PangoCairo.create_layout(cr)
+        font = Pango.FontDescription.from_string(
+            f"Inter Display, Inter, Cantarell, Sans {'Semi-Bold' if bold else ''} {size}")
+        layout.set_font_description(font)
+        if width:
+            layout.set_width(int(width * Pango.SCALE))
+            layout.set_ellipsize(Pango.EllipsizeMode.MIDDLE)
+            layout.set_alignment(Pango.Alignment.CENTER)
+        layout.set_text(text, -1)
         tw, th = layout.get_pixel_size()
-        w, h = tw + 2 * pad, th + 10
-        _rounded_rect(cr, x - w / 2, y - h / 2, w, h, h / 2)
-        cr.set_source_rgba(*((0.22, 0.12, 0.08, 0.80) if dark else (1, 1, 1, 0.95)))
-        cr.fill_preserve()
-        cr.set_source_rgba(1, 1, 1, 0.25 if dark else 0.9)
-        cr.set_line_width(1)
-        cr.stroke()
-        cr.move_to(x - tw / 2, y - th / 2)
-        cr.set_source_rgb(*(WHITE if dark else INK))
+        lx = x - (width / 2 if width else tw / 2)
+        cr.move_to(lx, y - th / 2)
+        cr.set_source_rgba(*rgb) if len(rgb) == 4 else cr.set_source_rgb(*rgb)
         PangoCairo.show_layout(cr, layout)
+        cr.new_path()
 
     def _paint_icon(self, cr, name, x, y, rgb, size=20):
         """Draw a symbolic theme icon tinted with rgb. Returns False if missing."""
-        if name not in self._icons:
+        key = (name, size)
+        if key not in self._icons:
             pix = None
             try:
                 theme = Gtk.IconTheme.get_for_display(self.get_display())
                 if theme.has_icon(name):
-                    icon = theme.lookup_icon(name, None, size, 1, Gtk.TextDirection.NONE, 0)
-                    f = icon.get_file()
+                    f = theme.lookup_icon(name, None, size, 1, Gtk.TextDirection.NONE, 0).get_file()
                     if f and f.get_path():
                         pix = GdkPixbuf.Pixbuf.new_from_file_at_size(f.get_path(), size, size)
             except GLib.Error:
                 pix = None
-            self._icons[name] = pix
-        pix = self._icons[name]
+            self._icons[key] = pix
+        pix = self._icons[key]
         if not pix:
             return False
         cr.save()
         Gdk.cairo_set_source_pixbuf(cr, pix, x, y)
         mask = cr.get_source()
-        cr.set_source_rgb(*rgb)
+        cr.set_source_rgb(*rgb[:3])
         cr.mask(mask)
         cr.restore()
+        cr.new_path()
         return True

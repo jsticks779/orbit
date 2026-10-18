@@ -7,6 +7,7 @@ import cairo
 import gi
 
 gi.require_version("Gtk", "4.0")
+gi.require_version("Gdk", "4.0")
 from gi.repository import Gdk, GLib, Gtk  # noqa: E402
 from PIL import Image  # noqa: E402
 
@@ -15,6 +16,7 @@ from ..actions.image import open_image, save_as  # noqa: E402
 
 PREVIEW = 520   # longest side of the on-screen preview (px)
 HANDLE = 9
+ACCENT = (0.43, 0.36, 1.0)
 
 
 def to_texture(img: Image.Image) -> Gdk.Texture:
@@ -197,7 +199,7 @@ class CropEditor(_Editor):
         cr.rectangle(x, y, rw, rh)
         cr.set_fill_rule(cairo.FILL_RULE_EVEN_ODD)
         cr.fill()
-        cr.set_source_rgb(0.91, 0.29, 0.18)
+        cr.set_source_rgb(*ACCENT)
         cr.set_line_width(2)
         cr.rectangle(x, y, rw, rh)
         cr.stroke()

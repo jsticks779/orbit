@@ -24,14 +24,14 @@ class OrbitApp(Adw.Application):
         self.watcher = None
         self._held = False
         act = Gio.SimpleAction.new("show-file", GLib.VariantType.new("s"))
-        act.connect("activate", lambda _a, p: self._show_in_files(p.get_string()))
+        act.connect("activate", lambda _a, p: self.show_in_files(p.get_string()))
         self.add_action(act)
 
     # ---- startup -------------------------------------------------------------
 
     def do_startup(self):
         Adw.Application.do_startup(self)
-        Adw.StyleManager.get_default().set_color_scheme(Adw.ColorScheme.PREFER_LIGHT)
+        Adw.StyleManager.get_default().set_color_scheme(Adw.ColorScheme.DEFAULT)  # follow system
         css = Gtk.CssProvider()
         css.load_from_path(str(Path(__file__).parent / "ui" / "style.css"))
         Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), css,
@@ -140,7 +140,7 @@ class OrbitApp(Adw.Application):
             self.fail(err)
         else:
             name = outs[0].name if len(outs) == 1 else f"{len(outs)} files saved"
-            ring.finish(True, name if outs else "Done")
+            ring.finish(True, name if outs else "Done", outs)
             self.done(outs)
         return False
 
@@ -163,7 +163,8 @@ class OrbitApp(Adw.Application):
         self.send_notification(None, n)
         log.info("%s %s", title, body)
 
-    def _show_in_files(self, path: str):
+    def show_in_files(self, path):
+        path = str(path)
         uri = Gio.File.new_for_path(path).get_uri()
         try:
             Gio.bus_get_sync(Gio.BusType.SESSION).call_sync(

@@ -47,9 +47,16 @@ def _load():
     from ..actions import archive, document, image, media  # noqa: F401
 
 
+_loaded = False
+
+
 def all_actions() -> list[Action]:
-    if not _REGISTRY:
+    # A flag, not "registry is empty": importing one action module directly
+    # must not stop the others from loading.
+    global _loaded
+    if not _loaded:
         _load()
+        _loaded = True
     return _REGISTRY
 
 

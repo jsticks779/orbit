@@ -7,7 +7,7 @@
 **Convert and edit any file with a drag + Shift.**
 Drag a file, tap <kbd>Shift</kbd>, drop it on a slice. Done.
 
-![The Orbit ring](docs/ring.png)
+![The Orbit panel (light and dark)](docs/ring.png)
 
 </div>
 
