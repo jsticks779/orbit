@@ -98,7 +98,7 @@ if ! id -nG "$USER" | grep -qw input; then
     warn "Not interactive. Later run: sudo usermod -aG input $USER"
   fi
   if [[ "$yn" =~ ^[Yy]$ ]]; then
-    sudo usermod -aG input "$USER" && RELOGIN=1 && ok "Added. Log out and back in once."
+    sudo usermod -aG input "$USER" && RELOGIN=1 && ok "Added."
   else
     warn "Skipped. Drag + Shift won't work, but right-click → Scripts → Orbit will."
   fi
@@ -106,10 +106,17 @@ fi
 
 # 5. Start ---------------------------------------------------------------------
 pkill -f "$VENV/bin/orbit" 2>/dev/null || true
-(setsid "$BIN" service >/dev/null 2>&1 &)
+# A new group only reaches this login session after logging out. `sg` applies it
+# to Orbit right now, so drag + Shift works immediately after installing.
+if id -nG "$USER" | grep -qw input && ! id -nG | grep -qw input; then
+  (setsid sg input -c "'$BIN' service" >/dev/null 2>&1 &)
+else
+  (setsid "$BIN" service >/dev/null 2>&1 &)
+fi
+sleep 1
 echo
 "$BIN" doctor || true
 echo
 ok "Orbit is ready. Type 'orbit' in a new terminal, or drag any file and tap Shift."
-((RELOGIN)) && warn "Log out and back in first so the new permission applies."
+((RELOGIN)) && ok "Drag + Shift works now. Log out and back in once to open the card under your pointer."
 exit 0
