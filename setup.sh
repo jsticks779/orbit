@@ -14,6 +14,18 @@ AUTOSTART="$HOME/.config/autostart/orbit.desktop"
 NAUTILUS="$HOME/.local/share/nautilus/scripts/Orbit"
 
 say()  { printf '\033[1;33m●\033[0m %s\n' "$*"; }
+step() { printf '\n\033[1m%s\033[0m\n' "$*"; }
+# Run a slow command with a live "still working" timer so it never looks frozen.
+with_timer() {
+  local label="$1"; shift
+  "$@" & local pid=$! start=$SECONDS
+  while kill -0 "$pid" 2>/dev/null; do
+    printf '\r  %s %dm %02ds ' "$label" $(((SECONDS - start) / 60)) $(((SECONDS - start) % 60))
+    sleep 1
+  done
+  printf '\r\033[K'
+  wait "$pid"
+}
 ok()   { printf '\033[1;32m✓\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;31m!\033[0m %s\n' "$*"; }
 
@@ -44,19 +56,22 @@ command -v soffice >/dev/null || PKGS+=(libreoffice-core-nogui libreoffice-write
 for pkg in "${PKGS[@]}"; do
   dpkg -s "$pkg" &>/dev/null || NEED+=("$pkg")
 done
+step "Step 1 of 4 · System packages"
 if ((${#NEED[@]})); then
-  say "Installing system packages: ${NEED[*]}"
+  say "Installing: ${NEED[*]}"
   sudo apt-get update -qq && sudo apt-get install -y "${NEED[@]}"
 fi
 command -v soffice >/dev/null || warn "LibreOffice isn't available: Word/Office conversions will be hidden."
 
 # 2. Python environment -------------------------------------------------------
-say "Creating Python environment in $VENV"
+step "Step 2 of 4 · Downloading Orbit's components"
+say "About 40 MB. On slow internet this can take a few minutes. Nothing to type."
 python3 -m venv --system-site-packages "$VENV"
 MODE=(); [[ "${1:-}" == "--dev" ]] && MODE=(-e)
-"$VENV/bin/pip" install -q --disable-pip-version-check --timeout 120 --retries 8 "${MODE[@]}" "$REPO"
+with_timer "downloading…" "$VENV/bin/pip" install -q --disable-pip-version-check --timeout 120 --retries 8 "${MODE[@]}" "$REPO"
+ok "Components ready"
 # Extras are a bonus: a slow connection must not block the install.
-if "$VENV/bin/pip" install -q --disable-pip-version-check --timeout 60 --retries 5 pdf2docx pillow-heif >/dev/null 2>&1; then
+if with_timer "adding extras (PDF to DOCX, HEIC)…" "$VENV/bin/pip" install -q --disable-pip-version-check --timeout 60 --retries 5 pdf2docx pillow-heif >/dev/null 2>&1; then
   ok "Installed extras (PDF to DOCX, HEIC)"
 else
   warn "Skipped extras (PDF to DOCX, HEIC). Run ./setup.sh again later to add them."
@@ -71,6 +86,7 @@ done
 ok "Installed the 'orbit' command"
 
 # 3. Desktop integration ------------------------------------------------------
+step "Step 3 of 4 · Adding Orbit to your desktop"
 install -Dm644 "$REPO/data/icons/$APP_ID.svg" "$PREFIX/share/icons/hicolor/scalable/apps/$APP_ID.svg"
 sed "s|^Exec=orbit|Exec=$BIN|" "$REPO/data/$APP_ID.desktop" | install -Dm644 /dev/stdin "$PREFIX/share/applications/$APP_ID.desktop"
 sed "s|^Exec=orbit|Exec=$BIN|" "$REPO/data/orbit-autostart.desktop" | install -Dm644 /dev/stdin "$AUTOSTART"
@@ -98,6 +114,7 @@ PY
 fi
 
 # 4. Permission to see drag + Shift ------------------------------------------
+step "Step 4 of 4 · Drag + Shift permission"
 RELOGIN=0
 if ! id -nG "$USER" | grep -qw input; then
   say "Orbit reads mouse button and Shift key events to detect drag + Shift."
@@ -114,6 +131,8 @@ if ! id -nG "$USER" | grep -qw input; then
   else
     warn "Skipped. Drag + Shift won't work, but right-click → Scripts → Orbit will."
   fi
+else
+  ok "Already allowed"
 fi
 
 # 5. Start ---------------------------------------------------------------------
