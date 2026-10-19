@@ -22,7 +22,7 @@ the original**. Your original is never touched.
 | 1. Drag and tap Shift | 2. Pick a bubble | 3. Drop. Done. |
 |:---:|:---:|:---:|
 | <img src="docs/assets/shot-convert.png" width="260" alt="Convert page"> | <img src="docs/assets/shot-tools.png" width="260" alt="Tools page"> | <img src="docs/assets/shot-done.png" width="260" alt="Finished"> |
-| The card opens under your pointer. | Bubbles grow as you get close. A one-line hint explains each one. Tap Shift again for Tools. | Real progress, a soft chime, and the card closes itself. |
+| The card opens under your pointer. | Bubbles grow as you get close, and a short hint explains each one. Tap Shift again for Tools. | You see progress, hear a short chime, and the card closes itself. |
 
 ## Formats
 
@@ -39,15 +39,16 @@ Orbit only shows what fits the file you're holding, and hides anything your syst
 
 ## Editors
 
-Some tools need a choice or two, so Orbit opens a tiny editor with a live preview.
-These examples were made by Orbit's own code (`tools/render_examples.py`).
+Some tools need a choice, so Orbit opens a small editor with a live preview.
+These are real screenshots captured from Orbit (`tools/render_editors.py`).
 
-| Crop | Edit | Add BG |
-|:---:|:---:|:---:|
-| <img src="docs/assets/ex-crop.jpg" width="260" alt="16:9 crop"> | <img src="docs/assets/ex-edit.jpg" width="260" alt="Warmer, more saturated"> | <img src="docs/assets/ex-bg-sunset.png" width="200" alt="Photo on a background"> |
-| Handles, 1:1 · 16:9 · 9:16 · 4:3 · 3:4, exact pixels | Brightness, contrast, saturation, warmth, sharpness, rotate, flip | Gradients or colours, padding, corners, shadow, ratio |
-
-**Trim** (video): start and end with a live frame preview, 0.5x to 2x speed, remove sound.
+| Crop | Edit |
+|:---:|:---:|
+| <img src="docs/assets/editor-crop.png" width="380" alt="Crop editor"> | <img src="docs/assets/editor-edit.png" width="380" alt="Edit editor"> |
+| Handles, 1:1 · 16:9 · 9:16 · 4:3 · 3:4, exact pixels | Brightness, contrast, saturation, warmth, sharpness, rotate, flip |
+| **Add BG** | **Trim** (video) |
+| <img src="docs/assets/editor-addbg.png" width="380" alt="Add BG editor"> | <img src="docs/assets/editor-trim.png" width="380" alt="Trim editor"> |
+| Background, rounded corners, shadow, ratio | Start and end with frame preview, 0.5x to 2x, remove sound |
 
 ## Install
 
@@ -98,3 +99,5 @@ with `tools/render_demo.py`, so they always match the app.
 ## License
 
 [MIT](LICENSE). Orby and the Orbit icon are part of this project and share its license.
+The Geist fonts are bundled under the [SIL Open Font License](src/orbit/fonts/OFL.txt).
+Sample photos are from Unsplash, see [photo credits](docs/assets/photos/CREDITS.md).

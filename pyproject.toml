@@ -27,7 +27,7 @@ orbit = "orbit.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-orbit = ["ui/*.css", "sounds/*.wav"]
+orbit = ["ui/*.css", "sounds/*.wav", "fonts/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

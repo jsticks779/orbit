@@ -231,7 +231,7 @@ class BackgroundEditor(_Editor):
         self.picture.add_css_class("orbit-preview")
         self.body.append(self.picture)
 
-        swatches = Gtk.FlowBox(max_children_per_line=10, selection_mode=Gtk.SelectionMode.NONE,
+        swatches = Gtk.FlowBox(min_children_per_line=9, max_children_per_line=9, selection_mode=Gtk.SelectionMode.NONE,
                                column_spacing=6, row_spacing=6)
         for i, (c1, c2, _) in enumerate(backdrop.GRADIENTS):
             swatches.append(self._swatch(f"linear-gradient(135deg, {c1}, {c2})", i))

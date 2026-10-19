@@ -60,18 +60,10 @@ img, video { display: block; max-width: 100%; }
 .hero-copy { display: flex; flex-direction: column; gap: 30px; }
 .kicker { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .ctas { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
-.stage { position: relative; height: 640px; }
+.stage { display: flex; justify-content: center; }
+.demo { width: min(600px, 100%); aspect-ratio: 600 / 640; }
 .card { background: #fff; border-radius: 22px; box-shadow: var(--card-shadow); }
-.demo-card { position: absolute; left: 50%; top: 50%; width: min(520px, 100%); transform: translate(-50%, -50%); overflow: hidden; background: var(--paper); }
-.demo-card video { width: 100%; aspect-ratio: 600 / 640; object-fit: cover; }
-.orby-float { position: absolute; width: 150px; left: -10px; top: 18px; animation: bob 3.2s ease-in-out infinite; }
-.toast { position: absolute; right: -6px; bottom: 70px; display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; width: 240px; border-radius: 18px; }
-.toast-head { display: flex; align-items: center; gap: 8px; }
-.dot { width: 8px; height: 8px; border-radius: 50%; background: #34c759; }
-.chip { position: absolute; font-family: "Geist Mono", monospace; font-weight: 600; font-size: 12px; letter-spacing: .06em; background: #fff; padding: 7px 10px; border-radius: 8px; box-shadow: 0 0 0 1px rgba(0,0,0,.07), 0 12px 24px -14px rgba(0,0,0,.35); animation: drift 6s ease-in-out infinite; }
-.chip.c2 { animation-delay: -2s; } .chip.c3 { animation-delay: -4s; }
 @keyframes bob { 0%,100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-10px) rotate(-2deg); } }
-@keyframes drift { 0%,100% { transform: translate(0,0); } 50% { transform: translate(6px,-8px); } }
 
 /* sections */
 .band { padding: 120px 0; }
@@ -83,7 +75,6 @@ img, video { display: block; max-width: 100%; }
 
 .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
 .step { display: flex; flex-direction: column; gap: 16px; }
-.step .card { overflow: hidden; background: var(--paper); }
 .step img { width: 100%; }
 
 .kinds { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--hair); }
@@ -92,17 +83,10 @@ img, video { display: block; max-width: 100%; }
 .fmt { font-family: "Geist Mono", monospace; font-weight: 600; font-size: 12px; letter-spacing: .04em; background: #fff; border: 1px solid var(--hair); padding: 5px 8px; border-radius: 6px; }
 .fmt.tool { background: var(--paper); }
 
-.tools { display: grid; grid-template-columns: repeat(2, 1fr); gap: 28px; }
-.tool-card { padding: 28px; display: flex; flex-direction: column; gap: 18px; }
-.ba { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.ba figure { display: flex; flex-direction: column; gap: 8px; }
-.ba img { border-radius: 12px; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: var(--paper); }
-.ba img.contain { object-fit: contain; }
-.trim { display: flex; flex-direction: column; gap: 12px; padding: 18px; background: var(--paper); border-radius: 12px; }
-.strip { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; position: relative; }
-.strip span { aspect-ratio: 16 / 10; border-radius: 4px; background: #d9d9d6; }
-.strip span.in { background: var(--ink); }
-.trim-row { display: flex; justify-content: space-between; }
+.tools { display: grid; grid-template-columns: repeat(2, 1fr); gap: 56px 40px; align-items: start; }
+.tool { display: flex; flex-direction: column; gap: 18px; }
+.tool img { border-radius: 14px; box-shadow: 0 0 0 1px rgba(0,0,0,.08), 0 30px 60px -30px rgba(0,0,0,.35); }
+.tool figcaption { display: flex; flex-direction: column; gap: 6px; max-width: 460px; }
 
 .privacy { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; }
 .privacy div { display: flex; flex-direction: column; gap: 12px; border-top: 1px solid #2a2a28; padding-top: 22px; }
@@ -118,20 +102,15 @@ img, video { display: block; max-width: 100%; }
 .final img { width: 120px; animation: bob 3.2s ease-in-out infinite; }
 .footer { display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap; padding: 28px 0 40px; border-top: 1px solid var(--hair); }
 
-@media (prefers-reduced-motion: reduce) { .orby-float, .chip, .final img { animation: none; } html { scroll-behavior: auto; } }
+@media (prefers-reduced-motion: reduce) { .final img { animation: none; } html { scroll-behavior: auto; } }
 @media (max-width: 1000px) {
   :root { --gutter: 22px; }
   .hero { grid-template-columns: 1fr; min-height: 0; }
-  .stage { height: 560px; }
   .steps, .kinds, .tools, .privacy, .install { grid-template-columns: 1fr; }
   .nav-links .link { display: none; }
   .band { padding: 80px 0; }
 }
 @media (max-width: 520px) {
-  .stage { height: 470px; }
-  .orby-float { width: 96px; }
-  .toast { width: 200px; bottom: 10px; }
-  .chip { display: none; }
 }
 </style>
 </head>
@@ -152,29 +131,18 @@ img, video { display: block; max-width: 100%; }
     <div class="hero-copy">
       <div class="kicker"><span class="tag">DRAG + SHIFT</span><span class="mono">File tools for Ubuntu</span></div>
       <h1 class="h-xl">Drag.<br>Shift.<br>Done.</h1>
-      <p class="lede">Start dragging any file, tap Shift, and drop it on what you want: a new format, a smaller size, a crop, a clean background. The result lands right next to the original.</p>
+      <p class="lede">Start dragging any file, tap Shift, and drop it on what you need: another format, a smaller size, a crop. The new file is saved next to the original.</p>
       <div class="ctas">
         <a class="pill" href="#install">Install on Ubuntu</a>
         <a class="play" href="#how"><span class="play-ring"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 1.5v11l9-5.5z" fill="currentColor"/></svg></span>See how it works</a>
       </div>
     </div>
 
-    <div class="stage" aria-label="Orbit in action">
-      <div class="card demo-card">
-        <video autoplay muted loop playsinline poster="assets/shot-convert.png">
-          <source src="assets/demo.webm" type="video/webm">
-          <source src="assets/demo.mp4" type="video/mp4">
-        </video>
-      </div>
-      <img class="orby-float" src="assets/orby.svg" alt="">
-      <span class="chip" style="right:6%;top:6%">PDF → JPG</span>
-      <span class="chip c2" style="left:2%;bottom:20%">MP4 → GIF</span>
-      <span class="chip c3" style="right:0;top:42%">HEIC → PNG</span>
-      <div class="card toast">
-        <div class="toast-head"><span class="dot"></span><span class="mono" style="color:var(--ink)">Saved</span></div>
-        <span style="font-weight:500">Sunset.webp</span>
-        <span class="mono" style="font-size:11px">Right next to Sunset.jpg</span>
-      </div>
+    <div class="stage">
+      <video class="demo" autoplay muted loop playsinline poster="assets/shot-convert.png" aria-label="Orbit converting a photo to WEBP">
+        <source src="assets/demo.webm" type="video/webm">
+        <source src="assets/demo.mp4" type="video/mp4">
+      </video>
     </div>
   </section>
 
@@ -186,22 +154,22 @@ img, video { display: block; max-width: 100%; }
       </div>
       <div class="steps">
         <div class="step">
-          <div class="card"><img src="assets/shot-convert.png" alt="Orbit card showing conversion bubbles" loading="lazy"></div>
+          <img src="assets/shot-convert.png" alt="Orbit card showing conversion bubbles" loading="lazy">
           <span class="mono">01</span>
           <span class="h-m">Drag and tap Shift</span>
           <p class="body">Start dragging a file from Files or your desktop, then tap Shift. Orbit's card opens right under your pointer.</p>
         </div>
         <div class="step">
-          <div class="card"><img src="assets/shot-tools.png" alt="Orbit card showing tools" loading="lazy"></div>
+          <img src="assets/shot-tools.png" alt="Orbit card showing tools" loading="lazy">
           <span class="mono">02</span>
           <span class="h-m">Pick a bubble</span>
           <p class="body">Bubbles grow as you get close, and a short line tells you what each one does. Tap Shift again for Tools.</p>
         </div>
         <div class="step">
-          <div class="card"><img src="assets/shot-done.png" alt="Orbit card showing a finished conversion" loading="lazy"></div>
+          <img src="assets/shot-done.png" alt="Orbit card showing a finished conversion" loading="lazy">
           <span class="mono">03</span>
           <span class="h-m">Drop. That's it.</span>
-          <p class="body">Real progress while it works, a soft chime when it's done, and the new file sits next to the original.</p>
+          <p class="body">Progress shows while it works. When it's done you hear a short chime and the new file is next to the original.</p>
         </div>
       </div>
     </div>
@@ -211,7 +179,7 @@ img, video { display: block; max-width: 100%; }
     <div class="wrap">
       <div class="sec-head">
         <span class="mono">Formats</span>
-        <h2 class="h-l">Every file.<br>The right options.</h2>
+        <h2 class="h-l">What you can drop.</h2>
         <p class="lede">Orbit only shows what makes sense for the file you're holding, and hides anything your system can't do.</p>
       </div>
       <div class="kinds">
@@ -220,7 +188,7 @@ img, video { display: block; max-width: 100%; }
         <div class="kind"><span class="h-m">Documents</span><div class="chips"><span class="fmt">PDF</span><span class="fmt">DOCX</span><span class="fmt">ODT</span><span class="fmt">TXT</span></div><div class="chips"><span class="fmt tool">Word</span><span class="fmt tool">PowerPoint</span><span class="fmt tool">Excel</span><span class="fmt tool">LibreOffice</span></div></div>
         <div class="kind"><span class="h-m">Video</span><div class="chips"><span class="fmt">MP4</span><span class="fmt">WEBM</span><span class="fmt">MOV</span><span class="fmt">MKV</span><span class="fmt">GIF</span><span class="fmt">MP3</span></div><div class="chips"><span class="fmt tool">Trim</span><span class="fmt tool">Compress</span><span class="fmt tool">Mute</span><span class="fmt tool">First frame</span></div></div>
         <div class="kind"><span class="h-m">Audio</span><div class="chips"><span class="fmt">MP3</span><span class="fmt">WAV</span><span class="fmt">OGG</span><span class="fmt">FLAC</span><span class="fmt">M4A</span><span class="fmt">OPUS</span></div><div class="chips"><span class="fmt tool">Normalize</span></div></div>
-        <div class="kind"><span class="h-m">Many files</span><div class="chips"><span class="fmt">One PDF</span><span class="fmt">Merge PDFs</span><span class="fmt">ZIP</span></div><p class="body">Drag several at once. Orbit knows what to offer.</p></div>
+        <div class="kind"><span class="h-m">Many files</span><div class="chips"><span class="fmt">One PDF</span><span class="fmt">Merge PDFs</span><span class="fmt">ZIP</span></div><p class="body">Drag several files at once to combine or zip them.</p></div>
       </div>
     </div>
   </section>
@@ -229,33 +197,14 @@ img, video { display: block; max-width: 100%; }
     <div class="wrap">
       <div class="sec-head">
         <span class="mono">Editors</span>
-        <h2 class="h-l">Small editors.<br>Big results.</h2>
-        <p class="lede">Some tools need a choice or two. Orbit opens a tiny editor with a live preview, then gets out of your way.</p>
+        <h2 class="h-l">Four small editors.</h2>
+        <p class="lede">For the jobs that need a choice. These are real screenshots, captured from Orbit itself.</p>
       </div>
       <div class="tools">
-        <div class="card tool-card">
-          <span class="h-m">Crop</span>
-          <div class="ba"><figure><img src="assets/ex-original.jpg" alt="Original photo" loading="lazy"><span class="mono">Before</span></figure><figure><img class="contain" src="assets/ex-crop.jpg" alt="Cropped to 16:9" loading="lazy"><span class="mono">16:9 crop</span></figure></div>
-          <p class="body">Drag the handles or pick 1:1, 16:9, 9:16, 4:3, 3:4. Type exact pixels if you need them.</p>
-        </div>
-        <div class="card tool-card">
-          <span class="h-m">Edit</span>
-          <div class="ba"><figure><img src="assets/ex-original.jpg" alt="Original photo" loading="lazy"><span class="mono">Before</span></figure><figure><img src="assets/ex-edit.jpg" alt="Warmer, more saturated" loading="lazy"><span class="mono">Warmer, punchier</span></figure></div>
-          <p class="body">Brightness, contrast, saturation, warmth and sharpness, plus rotate and flip.</p>
-        </div>
-        <div class="card tool-card">
-          <span class="h-m">Add BG</span>
-          <div class="ba"><figure><img class="contain" src="assets/ex-bg-mist.png" alt="Photo on a soft grey background" loading="lazy"><span class="mono">Mist</span></figure><figure><img class="contain" src="assets/ex-bg-sunset.png" alt="Photo on a sunset gradient" loading="lazy"><span class="mono">Sunset</span></figure></div>
-          <p class="body">Screenshots and photos on a clean background with rounded corners, a soft shadow and the ratio you need.</p>
-        </div>
-        <div class="card tool-card">
-          <span class="h-m">Trim</span>
-          <div class="trim">
-            <div class="strip"><span></span><span></span><span class="in"></span><span class="in"></span><span class="in"></span><span class="in"></span><span></span><span></span></div>
-            <div class="trim-row"><span class="mono">0:12.4 → 0:31.0</span><span class="mono">2x · No sound</span></div>
-          </div>
-          <p class="body">Pick a start and end with a live frame preview, speed it up or slow it down, and drop the sound.</p>
-        </div>
+        <figure class="tool"><img src="assets/editor-crop.png" alt="Crop editor with a photo of a pug, 16:9 selected" loading="lazy"><figcaption><span class="h-m">Crop</span><span class="body">Drag the handles or pick 1:1, 16:9, 9:16, 4:3 or 3:4. Exact pixels if you need them.</span></figcaption></figure>
+        <figure class="tool"><img src="assets/editor-edit.png" alt="Edit editor with brightness, contrast, saturation, warmth and sharpness sliders" loading="lazy"><figcaption><span class="h-m">Edit</span><span class="body">Brightness, contrast, saturation, warmth and sharpness. Rotate and flip.</span></figcaption></figure>
+        <figure class="tool"><img src="assets/editor-addbg.png" alt="Add BG editor with strawberries on a green background" loading="lazy"><figcaption><span class="h-m">Add BG</span><span class="body">A background, rounded corners, a soft shadow and the ratio you need. Good for screenshots.</span></figcaption></figure>
+        <figure class="tool"><img src="assets/editor-trim.png" alt="Trim editor with a waterfall clip, 2x speed and sound removed" loading="lazy"><figcaption><span class="h-m">Trim</span><span class="body">Pick a start and end with a frame preview. Change the speed or remove the sound.</span></figcaption></figure>
       </div>
     </div>
   </section>
@@ -287,13 +236,13 @@ img, video { display: block; max-width: 100%; }
 
   <section class="wrap final">
     <img src="assets/orby.svg" alt="">
-    <h2 class="h-l">Give your files<br>an orbit.</h2>
+    <h2 class="h-l">Try it on<br>your next file.</h2>
     <div class="ctas"><a class="pill" href="#install">Install on Ubuntu</a><a class="link" href="https://github.com/jsticks779/orbit">Star on GitHub</a></div>
   </section>
 
   <footer class="wrap footer">
     <a class="logo" href="#" style="font-size:20px"><img src="assets/orby.svg" alt="" style="width:32px;height:32px">orbit</a>
-    <span class="mono">MIT licensed · made by jsticks779</span>
+    <span class="mono">MIT licensed · made by jsticks779 · <a href="https://github.com/jsticks779/orbit/blob/main/docs/assets/photos/CREDITS.md">photo credits</a></span>
     <a class="link" href="https://github.com/jsticks779/orbit">GitHub</a>
   </footer>
 </main>

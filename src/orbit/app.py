@@ -17,6 +17,18 @@ from .core.actions import Action  # noqa: E402
 log = logging.getLogger("orbit")
 
 
+def _load_fonts():
+    """Make the bundled Geist fonts available to this process (no install needed)."""
+    import ctypes
+    import ctypes.util
+    try:
+        fc = ctypes.CDLL(ctypes.util.find_library("fontconfig") or "libfontconfig.so.1")
+        for f in (Path(__file__).parent / "fonts").glob("*.ttf"):
+            fc.FcConfigAppFontAddFile(None, str(f).encode())
+    except OSError:
+        pass  # falls back to the system font
+
+
 class OrbitApp(Adw.Application):
     def __init__(self):
         super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE)
@@ -30,6 +42,7 @@ class OrbitApp(Adw.Application):
     # ---- startup -------------------------------------------------------------
 
     def do_startup(self):
+        _load_fonts()
         Adw.Application.do_startup(self)
         Adw.StyleManager.get_default().set_color_scheme(Adw.ColorScheme.FORCE_LIGHT)  # always light
         css = Gtk.CssProvider()

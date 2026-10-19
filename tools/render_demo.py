@@ -21,14 +21,14 @@ OUT = ROOT / "docs" / "assets"
 
 from gi.repository import Gio  # noqa: E402
 
-from orbit.app import OrbitApp  # noqa: E402
+from orbit.app import OrbitApp, _load_fonts  # noqa: E402
 from orbit.ui import ring as R  # noqa: E402
 from orbit.ui.thumbs import thumbnail  # noqa: E402
 
 FPS, SCALE = 30, 2
 CW, CH = 600, 640                       # canvas (logical px)
 OX, OY = (CW - R.W) / 2, (CH - R.H) / 2  # card position on the canvas
-PAPER = (0.969, 0.969, 0.961)           # #f7f7f5
+PAPER = (1, 1, 1)                       # matches the page background
 
 
 def sample_photo(path: Path):
@@ -84,7 +84,7 @@ def draw_pointer(cr, x, y, dragging, thumb):
 
 
 def card_background(cr):
-    for grow, alpha in ((26, 0.05), (14, 0.07), (5, 0.09)):
+    for grow, alpha in [(g, 0.011) for g in range(48, 0, -3)]:  # many faint layers = smooth shadow
         R._rounded(cr, OX - grow / 2, OY + grow / 2.5, R.W + grow, R.H + grow / 2, 24 + grow / 2)
         cr.set_source_rgba(0, 0, 0, alpha)
         cr.fill()
@@ -98,8 +98,9 @@ def card_background(cr):
 
 def main():
     tmp = Path(tempfile.mkdtemp())
-    photo = tmp / "Sunset.jpg"
-    sample_photo(photo)
+    photo = tmp / "Fjord.jpg"
+    shutil.copy(OUT / "photos" / "fjord.jpg", photo)  # real photo, see photos/CREDITS.md
+    _load_fonts()
     app = OrbitApp()
     app.set_flags(app.get_flags() | Gio.ApplicationFlags.NON_UNIQUE)
     app.register(None)
@@ -152,7 +153,7 @@ def main():
         if r.mode == "progress":
             r.set_progress(smooth((t - 6.05) / 1.3))
             if t >= 7.45:
-                r.finish(True, "Sunset.webp")
+                r.finish(True, "Fjord.webp")
         r._animate()
         if r.mode == "done" and t > 8.4:
             r.fade = max(0.0, 1 - (t - 8.4) / 0.5)
@@ -171,14 +172,17 @@ def main():
         cr.restore()
         draw_pointer(cr, px, py, dragging=r.mode == "menu", thumb=drag_thumb)
         surf.write_to_png(str(tmp / f"f{f:04d}.png"))
-        if abs(t - 1.6) < 1 / FPS / 2:
-            shutil.copy(tmp / f"f{f:04d}.png", OUT / "shot-convert.png")
-        if abs(t - 3.95) < 1 / FPS / 2:
-            shutil.copy(tmp / f"f{f:04d}.png", OUT / "shot-tools.png")
-        if abs(t - 6.7) < 1 / FPS / 2:
-            shutil.copy(tmp / f"f{f:04d}.png", OUT / "shot-progress.png")
-        if abs(t - 7.9) < 1 / FPS / 2:
-            shutil.copy(tmp / f"f{f:04d}.png", OUT / "shot-done.png")
+        for when, name in ((1.6, "convert"), (3.95, "tools"), (6.7, "progress"), (7.9, "done")):
+            if abs(t - when) < 1 / FPS / 2:  # transparent screenshot of the same frame
+                shot = cairo.ImageSurface(cairo.FORMAT_ARGB32, CW * SCALE, CH * SCALE)
+                sc = cairo.Context(shot)
+                sc.scale(SCALE, SCALE)
+                card_background(sc)
+                sc.translate(OX, OY)
+                r._draw(None, sc, R.W, R.H)
+                sc.translate(-OX, -OY)
+                draw_pointer(sc, px, py, dragging=r.mode == "menu", thumb=drag_thumb)
+                shot.write_to_png(str(OUT / f"shot-{name}.png"))
 
     ff = ["ffmpeg", "-v", "error", "-y", "-framerate", str(FPS), "-i", str(tmp / "f%04d.png")]
     subprocess.run(ff + ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "20", "-movflags", "+faststart",
@@ -186,7 +190,6 @@ def main():
     subprocess.run(ff + ["-c:v", "libvpx-vp9", "-b:v", "0", "-crf", "34", str(OUT / "demo.webm")], check=True)
     subprocess.run(ff + ["-vf", "fps=20,scale=480:-1:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];"
                          "[b][p]paletteuse=dither=sierra2_4a", str(OUT / "demo.gif")], check=True)
-    shutil.copy(photo, OUT / "sample-photo.jpg")
     shutil.rmtree(tmp)
     print("wrote", ", ".join(p.name for p in sorted(OUT.glob("demo.*"))))
 

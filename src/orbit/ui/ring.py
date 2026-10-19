@@ -649,7 +649,7 @@ class RingWindow(Gtk.Window):
             return
         layout = PangoCairo.create_layout(cr)
         font = Pango.FontDescription.from_string(
-            f"Inter Display, Inter, Cantarell, Sans {'Semi-Bold' if bold else ''} {size}")
+            f"Geist, Cantarell, Sans {'Semi-Bold' if bold else 'Medium'} {size}")
         layout.set_font_description(font)
         if width:
             layout.set_width(int(width * Pango.SCALE))
