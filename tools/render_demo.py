@@ -62,8 +62,8 @@ def draw_pointer(cr, x, y, dragging, thumb):
         cr.save()
         cr.translate(x + 10, y + 14)
         k = 54 / max(thumb.get_width(), thumb.get_height())
-        cr.rectangle(-2, -2, thumb.get_width() * k + 4, thumb.get_height() * k + 4)
-        cr.set_source_rgb(1, 1, 1)
+        cr.rectangle(-3, -3, thumb.get_width() * k + 6, thumb.get_height() * k + 6)
+        cr.set_source_rgba(1, 1, 1, 0.9)
         cr.fill()
         cr.scale(k, k)
         cr.set_source_surface(thumb, 0, 0)
@@ -84,11 +84,14 @@ def draw_pointer(cr, x, y, dragging, thumb):
 
 
 def card_background(cr):
-    """Flat card: nearly square corners and a hairline border, no shadow."""
-    R._rounded(cr, OX + 0.5, OY + 0.5, R.W - 1, R.H - 1, 8)
+    for grow, alpha in [(g, 0.011) for g in range(48, 0, -3)]:  # many faint layers = smooth shadow
+        R._rounded(cr, OX - grow / 2, OY + grow / 2.5, R.W + grow, R.H + grow / 2, 24 + grow / 2)
+        cr.set_source_rgba(0, 0, 0, alpha)
+        cr.fill()
+    R._rounded(cr, OX, OY, R.W, R.H, 24)
     cr.set_source_rgb(0.961, 0.961, 0.969)
     cr.fill_preserve()
-    cr.set_source_rgba(0, 0, 0, 0.14)
+    cr.set_source_rgba(0, 0, 0, 0.06)
     cr.set_line_width(1)
     cr.stroke()
 

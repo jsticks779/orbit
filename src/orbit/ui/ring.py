@@ -317,7 +317,7 @@ class RingWindow(Gtk.Window):
             return 1.0
         bx, by = self._btn_pos(i)
         d = math.hypot(self.pointer[0] - bx, self.pointer[1] - by)
-        return 1.0  # flat design: no magnify on hover
+        return 1.0 + 0.24 * math.exp(-(d / 62) ** 2)
 
     def _hover_btn(self):
         return self.hover[1] if self.hover and self.hover[0] == "btn" else None
@@ -452,11 +452,14 @@ class RingWindow(Gtk.Window):
         if len(self.pages) > 1:
             rects = self._seg_rects()
             x0, y0 = rects[0][0], rects[0][1]
-            _rounded(cr, x0 - 2, y0 - 2, sum(r[2] for r in rects) + 4, 34, 6)
+            _rounded(cr, x0 - 2, y0 - 2, sum(r[2] for r in rects) + 4, 34, 10)
             cr.set_source_rgba(*t["fill"])
             cr.fill()
             sx, sy, sw, sh = rects[self.page]
-            _rounded(cr, sx + 1, sy, sw - 2, sh - 2, 4)
+            _rounded(cr, sx + 1, sy + 1, sw - 2, sh - 2, 8)
+            cr.set_source_rgba(0, 0, 0, 0.10)
+            cr.fill()
+            _rounded(cr, sx + 1, sy, sw - 2, sh - 2, 8)
             cr.set_source_rgba(*t["seg_on"])
             cr.fill()
             for i, (rx, ry, rw, rh) in enumerate(rects):
@@ -491,27 +494,56 @@ class RingWindow(Gtk.Window):
             self._text(cr, "Drop a file here", CX, H - M - 40, t["secondary"], 9.5)
 
     def _button(self, cr, i, act):
-        """A flat colour tile with nearly square corners. Hover = dark outline, no movement."""
+        """A glossy Apple-style bubble: colour gradient, soft shadow, specular highlight."""
         t = self.theme
         x, y = self._btn_pos(i)
-        r = self._btn_radius()
+        r = self._btn_radius() * self.scales.get(i, 1.0)
         hot = self._hover_btn() == i
         c = bubble_color(i, len(self.actions))
-        _rounded(cr, x - r, y - r, 2 * r, 2 * r, 6)
-        cr.set_source_rgb(*c)
+        light = tuple(min(1, v + (1 - v) * 0.35) for v in c)
+        deep = tuple(v * 0.78 for v in c)
+
+        cr.new_path()  # shadow / glow
+        sh = cairo.RadialGradient(x, y + r * 0.35, r * 0.5, x, y + r * 0.35, r * 1.35)
+        sh.add_color_stop_rgba(0, 0, 0, 0, 0.22)
+        sh.add_color_stop_rgba(1, 0, 0, 0, 0)
+        cr.arc(x, y + r * 0.35, r * 1.35, 0, 2 * math.pi)
+        cr.set_source(sh)
         cr.fill()
-        if hot:
-            _rounded(cr, x - r - 4, y - r - 4, 2 * r + 8, 2 * r + 8, 8)
-            cr.set_source_rgb(*t["label"][:3])
-            cr.set_line_width(2)
-            cr.stroke()
-        # Light tiles (yellow) get dark ink so labels stay readable.
+
+        body = cairo.RadialGradient(x - r * 0.3, y - r * 0.45, r * 0.1, x, y, r * 1.05)
+        body.add_color_stop_rgb(0, *light)
+        body.add_color_stop_rgb(0.55, *c)
+        body.add_color_stop_rgb(1, *deep)
+        cr.arc(x, y, r, 0, 2 * math.pi)
+        cr.set_source(body)
+        cr.fill()
+
+        cr.save()  # specular highlight: a soft glossy cap
+        cr.translate(x, y - r * 0.42)
+        cr.scale(r * 0.62, r * 0.36)
+        gloss = cairo.LinearGradient(0, -1, 0, 1)
+        gloss.add_color_stop_rgba(0, 1, 1, 1, 0.55)
+        gloss.add_color_stop_rgba(1, 1, 1, 1, 0.0)
+        cr.arc(0, 0, 1, 0, 2 * math.pi)
+        cr.set_source(gloss)
+        cr.fill()
+        cr.restore()
+
+        cr.arc(x, y, r - 0.5, 0, 2 * math.pi)  # crisp rim
+        cr.set_source_rgba(1, 1, 1, 0.9 if hot else 0.25)
+        cr.set_line_width(2 if hot else 1)
+        cr.stroke()
+
+        # Light bubbles (yellow) get dark ink so labels stay readable.
         lum = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
-        ink = (0.1, 0.08, 0.0) if lum > 0.68 else (1, 1, 1)
+        ink = (0.25, 0.18, 0.0) if lum > 0.68 else (1, 1, 1)
         if act.icon and self._paint_icon(cr, act.icon, x - 10, y - 10, ink):
-            self._text(cr, act.label, x, y + r + 13, t["label"], 8.5, bold=hot)
+            self._text(cr, act.label, x, y + r + 12, t["label"], 8.5, bold=hot)
         else:
-            self._text(cr, act.label, x, y, ink, 10.5 if len(act.label) <= 4 else 8.5, bold=True)
+            size = (10.5 if len(act.label) <= 4 else 8.5) * min(1.12, self.scales.get(i, 1.0))
+            self._text(cr, act.label, x, y + 0.5, (0, 0, 0, 0.18), size, bold=True)  # soft text shadow
+            self._text(cr, act.label, x, y - 0.5, ink, size, bold=True)
 
     def _draw_centre(self, cr):
         """File preview, or the progress ring around it."""
@@ -519,14 +551,14 @@ class RingWindow(Gtk.Window):
         busy = self.mode != "menu"
         tw = 92
         tx, ty = CX - tw / 2, CY - tw / 2 - (14 if not busy else 0)
-        _rounded(cr, tx, ty, tw, tw, 6)
+        _rounded(cr, tx, ty, tw, tw, 20)
         cr.set_source_rgba(*t["thumb_bg"])
         cr.fill()
         if self.thumb:
             sw, sh = self.thumb.get_width(), self.thumb.get_height()
             k = min((tw - 12) / sw, (tw - 12) / sh)
             cr.save()
-            _rounded(cr, tx, ty, tw, tw, 6)
+            _rounded(cr, tx, ty, tw, tw, 20)
             cr.clip()
             cr.translate(CX - sw * k / 2, ty + tw / 2 - sh * k / 2)
             cr.scale(k, k)

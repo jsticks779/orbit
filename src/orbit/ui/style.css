@@ -6,17 +6,17 @@
 /* The card is a normal borderless window: GNOME rounds it and adds the shadow. */
 window.orbit-card {
   background-color: #F5F5F7;
-  border-radius: 8px;
+  border-radius: 24px;
 }
 window.orbit-card > * { background: transparent; }
 
-window.orbit-editor { border-radius: 8px; font-family: Geist, Cantarell, sans-serif; }
+window.orbit-editor { border-radius: 12px; font-family: Geist, Cantarell, sans-serif; }
 window.orbit-editor .orbit-info, window.orbit-editor spinbutton { font-family: "Geist Mono", monospace; }
 window.orbit-editor headerbar { background: transparent; box-shadow: none; }
 window.orbit-editor .orbit-title { font-weight: 700; }
 window.orbit-editor .orbit-info { font-feature-settings: "tnum"; opacity: 0.75; }
 window.orbit-editor .dim-label { opacity: 0.6; }
-window.orbit-editor .orbit-preview { border-radius: 4px; background: alpha(currentColor, 0.05); }
+window.orbit-editor .orbit-preview { border-radius: 10px; background: alpha(currentColor, 0.05); }
 window.orbit-editor button.suggested-action { background: #0A84FF; color: white; }
 window.orbit-editor button:checked { background: #0A84FF; color: white; }
 window.orbit-editor scale highlight { background: #0A84FF; }
@@ -25,15 +25,6 @@ button.orbit-swatch {
   min-width: 26px;
   min-height: 26px;
   padding: 0;
-  border-radius: 4px;
+  border-radius: 999px;
   border: 1px solid alpha(currentColor, 0.15);
 }
-
-/* Flat: nearly square corners, no shadows. */
-window.orbit-editor button,
-window.orbit-editor spinbutton,
-window.orbit-editor entry { border-radius: 4px; box-shadow: none; }
-window.orbit-editor button.circular { border-radius: 4px; }
-window.orbit-editor scale slider { box-shadow: none; border: 1px solid alpha(black, 0.2); }
-window.orbit-card, window.orbit-editor { box-shadow: none; }
-window.orbit-card, window.orbit-editor { outline: 1px solid alpha(black, 0.14); outline-offset: -1px; }

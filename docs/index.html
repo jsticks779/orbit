@@ -54,6 +54,7 @@ img, video { display: block; max-width: 100%; }
 .logo { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 26px; letter-spacing: -.045em; }
 .logo img { width: 42px; height: 42px; }
 .nav-links { display: flex; align-items: center; gap: 28px; }
+.gh { display: none; color: var(--ink); }
 
 /* hero */
 .hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 40px; align-items: center; min-height: 720px; padding-bottom: 60px; }
@@ -108,9 +109,15 @@ img, video { display: block; max-width: 100%; }
   .hero { grid-template-columns: 1fr; min-height: 0; }
   .steps, .kinds, .tools, .privacy, .install { grid-template-columns: 1fr; }
   .nav-links .link { display: none; }
+  .nav-links { gap: 16px; }
+  .gh { display: inline-flex; }
   .band { padding: 80px 0; }
 }
 @media (max-width: 520px) {
+  .ctas { flex-wrap: nowrap; gap: 14px; }
+  .ctas .pill { font-size: 15px; padding: 12px 16px; white-space: nowrap; }
+  .play { font-size: 15px; gap: 10px; white-space: nowrap; }
+  .play-ring { width: 38px; height: 38px; flex-shrink: 0; }
 }
 </style>
 </head>
@@ -122,6 +129,7 @@ img, video { display: block; max-width: 100%; }
     <a class="link" href="#how">How it works</a>
     <a class="link" href="#formats">Formats</a>
     <a class="link" href="https://github.com/jsticks779/orbit">Open source</a>
+    <a class="gh" href="https://github.com/jsticks779/orbit" aria-label="Orbit on GitHub (open source)"><svg width="22" height="22" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a>
     <a class="pill pill-sm" href="#install">Install</a>
   </nav>
 </header>
@@ -154,7 +162,7 @@ img, video { display: block; max-width: 100%; }
       </div>
       <div class="steps">
         <div class="step">
-          <img src="assets/shot-convert.png" alt="Orbit card showing conversion tiles" loading="lazy">
+          <img src="assets/shot-convert.png" alt="Orbit card showing conversion bubbles" loading="lazy">
           <span class="mono">01</span>
           <span class="h-m">Drag and tap Shift</span>
           <p class="body">Start dragging a file from Files or your desktop, then tap Shift. Orbit's card opens right under your pointer.</p>
@@ -162,8 +170,8 @@ img, video { display: block; max-width: 100%; }
         <div class="step">
           <img src="assets/shot-tools.png" alt="Orbit card showing tools" loading="lazy">
           <span class="mono">02</span>
-          <span class="h-m">Pick a tile</span>
-          <p class="body">The tile under your pointer gets an outline, and a short line says what it does. Tap Shift again for Tools.</p>
+          <span class="h-m">Pick a bubble</span>
+          <p class="body">Bubbles grow as you get close, and a short line tells you what each one does. Tap Shift again for Tools.</p>
         </div>
         <div class="step">
           <img src="assets/shot-done.png" alt="Orbit card showing a finished conversion" loading="lazy">
