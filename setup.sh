@@ -18,7 +18,10 @@ ok()   { printf '\033[1;32m✓\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;31m!\033[0m %s\n' "$*"; }
 
 if [[ "${1:-}" == "--uninstall" ]]; then
-  pkill -f "$VENV/bin/orbit" 2>/dev/null || true
+  for pid in $(pgrep -f "^$VENV/bin/python" 2>/dev/null); do kill "$pid" 2>/dev/null || true; done
+  for rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
+    [[ -f "$rc" ]] && sed -i '/^# orbit: ~\/.local\/bin$/,+1d' "$rc"
+  done
   gnome-extensions disable orbit@jsticks779.github.io 2>/dev/null || true
   rm -rf "$PREFIX/share/orbit" "$BIN" "$AUTOSTART" "$NAUTILUS" "$HOME/.local/share/gnome-shell/extensions/orbit@jsticks779.github.io" \
     "$PREFIX/share/applications/$APP_ID.desktop" \
@@ -29,14 +32,23 @@ fi
 
 # 1. System packages ----------------------------------------------------------
 NEED=()
-for pkg in python3-venv python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 ffmpeg ghostscript; do
+. /etc/os-release 2>/dev/null || true
+if [[ "${ID:-}" == "ubuntu" ]] && dpkg --compare-versions "${VERSION_ID:-0}" lt 24.04; then
+  warn "Orbit needs Ubuntu 24.04 or newer (you have ${VERSION_ID:-unknown}). Continuing, but some parts may not work."
+fi
+PKGS=(python3-venv python3-gi python3-gi-cairo gir1.2-gtk-4.0 gir1.2-adw-1
+      gir1.2-gstreamer-1.0 gstreamer1.0-plugins-good ffmpeg ghostscript curl)
+# Office conversions: the lightweight headless LibreOffice, unless a full one is already there.
+command -v soffice >/dev/null || PKGS+=(libreoffice-core-nogui libreoffice-writer-nogui
+                                        libreoffice-calc-nogui libreoffice-impress-nogui)
+for pkg in "${PKGS[@]}"; do
   dpkg -s "$pkg" &>/dev/null || NEED+=("$pkg")
 done
 if ((${#NEED[@]})); then
   say "Installing system packages: ${NEED[*]}"
   sudo apt-get update -qq && sudo apt-get install -y "${NEED[@]}"
 fi
-command -v soffice >/dev/null || warn "LibreOffice not found: DOCX/ODT/PPTX conversions need it (sudo apt install libreoffice)."
+command -v soffice >/dev/null || warn "LibreOffice isn't available: Word/Office conversions will be hidden."
 
 # 2. Python environment -------------------------------------------------------
 say "Creating Python environment in $VENV"
@@ -44,7 +56,7 @@ python3 -m venv --system-site-packages "$VENV"
 MODE=(); [[ "${1:-}" == "--dev" ]] && MODE=(-e)
 "$VENV/bin/pip" install -q --disable-pip-version-check --timeout 120 --retries 8 "${MODE[@]}" "$REPO"
 # Extras are a bonus: a slow connection must not block the install.
-if "$VENV/bin/pip" install -q --disable-pip-version-check --timeout 30 --retries 1 pdf2docx pillow-heif >/dev/null 2>&1; then
+if "$VENV/bin/pip" install -q --disable-pip-version-check --timeout 60 --retries 5 pdf2docx pillow-heif >/dev/null 2>&1; then
   ok "Installed extras (PDF to DOCX, HEIC)"
 else
   warn "Skipped extras (PDF to DOCX, HEIC). Run ./setup.sh again later to add them."
