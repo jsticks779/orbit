@@ -92,7 +92,10 @@ img, video { display: block; max-width: 100%; }
 .privacy { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; }
 .privacy div { display: flex; flex-direction: column; gap: 12px; border-top: 1px solid #2a2a28; padding-top: 22px; }
 
-.install { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center; }
+.install { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: start; }
+.install-right { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.term { width: 100%; border-radius: 6px; border: var(--line); }
+code { font-family: "Geist Mono", monospace; font-size: .92em; background: var(--paper); padding: 1px 5px; border-radius: 3px; }
 .code { position: relative; background: var(--ink); color: #f2f2f0; border-radius: 6px; padding: 26px 28px; font-family: "Geist Mono", monospace; font-size: 15px; line-height: 28px; overflow-x: auto; }
 .code .c { color: #8a8a86; }
 .code .p { color: var(--sun); }
@@ -241,9 +244,9 @@ img, video { display: block; max-width: 100%; }
       <div class="sec-head" style="margin:0">
         <span class="mono">Install</span>
         <h2 class="h-l">One line.<br>Then type orbit.</h2>
-        <p class="lede">For Ubuntu 24.04 and newer. Paste it in a terminal. When it finishes, log out and back in once so drag + Shift can work.</p>
+        <p class="lede">For Ubuntu 24.04 and newer. Paste it in a terminal and wait a minute or two. It installs everything Orbit needs and starts it.</p>
       </div>
-      <div class="code"><button class="copy" data-copy>COPY</button><span class="c"># install Orbit</span><br><span class="p">$</span> curl -fsSL https://jsticks779.github.io/orbit/install.sh | bash<br><br><span class="c"># then, in a new terminal</span><br><span class="p">$</span> orbit</div>
+      <div class="install-right"><div class="code"><button class="copy" data-copy>COPY</button><span class="c"># install Orbit</span><br><span class="p">$</span> curl -fsSL https://jsticks779.github.io/orbit/install.sh | bash<br><br><span class="c"># then, in a new terminal</span><br><span class="p">$</span> orbit</div><img class="term" src="assets/terminal.png" alt="Terminal after installing: numbered steps, a big ORBIT and 'Orbit is running'" loading="lazy"><p class="body">This is what you see when it finishes. Orbit is already running. Type <code>orbit</code> any time to see it again.</p></div>
     </div>
   </section>
 

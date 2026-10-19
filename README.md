@@ -58,9 +58,18 @@ Ubuntu 24.04 or newer. Paste this in a terminal:
 curl -fsSL https://jsticks779.github.io/orbit/install.sh | bash
 ```
 
-Then **log out and back in once**. That turns on the drag + Shift permission and the small GNOME Shell
-helper that opens the card under your pointer (Wayland apps can't position their own windows).
-Orbit starts with every session, and typing `orbit` in a terminal shows its status and commands.
+It takes a minute or two (longer on slow internet) and shows numbered steps with a timer.
+It may ask for your password once, for system packages. When it finishes you'll see this:
+
+<img src="docs/assets/terminal.png" width="560" alt="Terminal after installing: the steps, then a big ORBIT and 'Orbit is running'">
+
+Orbit is already running at that point: drag a file, keep holding, and tap Shift.
+Type `orbit` in any terminal to see this screen again.
+
+
+Log out and back in once when convenient. That turns on the small GNOME Shell helper that opens the
+card right under your pointer (Wayland apps can't position their own windows). After that, Orbit
+starts with every session by itself.
 
 <details><summary>Prefer to install from a clone?</summary>
 
