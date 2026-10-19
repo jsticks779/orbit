@@ -7,5 +7,4 @@ Icon=io.github.jsticks779.Orbit
 Terminal=false
 Categories=Utility;Graphics;
 Keywords=convert;pdf;image;jpg;png;compress;crop;
-MimeType=image/png;image/jpeg;image/webp;image/heic;image/avif;image/bmp;image/tiff;image/gif;application/pdf;video/mp4;audio/mpeg;
 StartupNotify=false
