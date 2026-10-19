@@ -41,14 +41,21 @@ command -v soffice >/dev/null || warn "LibreOffice not found: DOCX/ODT/PPTX conv
 # 2. Python environment -------------------------------------------------------
 say "Creating Python environment in $VENV"
 python3 -m venv --system-site-packages "$VENV"
-"$VENV/bin/pip" install -q --upgrade pip
 MODE=(); [[ "${1:-}" == "--dev" ]] && MODE=(-e)
-if ! "$VENV/bin/pip" install -q --timeout 120 "${MODE[@]}" "$REPO[full]"; then
-  warn "Optional extras (PDF→DOCX, HEIC) failed to install; installing the core."
-  "$VENV/bin/pip" install -q --timeout 120 "${MODE[@]}" "$REPO"
+"$VENV/bin/pip" install -q --disable-pip-version-check --timeout 120 --retries 8 "${MODE[@]}" "$REPO"
+# Extras are a bonus: a slow connection must not block the install.
+if "$VENV/bin/pip" install -q --disable-pip-version-check --timeout 30 --retries 1 pdf2docx pillow-heif >/dev/null 2>&1; then
+  ok "Installed extras (PDF to DOCX, HEIC)"
+else
+  warn "Skipped extras (PDF to DOCX, HEIC). Run ./setup.sh again later to add them."
 fi
 mkdir -p "$(dirname "$BIN")"
 ln -sf "$VENV/bin/orbit" "$BIN"
+# Make sure `orbit` works in every new terminal (bash and zsh).
+for rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
+  [[ -f "$rc" ]] || continue
+  grep -q "# orbit: ~/.local/bin" "$rc" || printf '\n# orbit: ~/.local/bin\ncase ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) export PATH="$HOME/.local/bin:$PATH" ;; esac\n' >> "$rc"
+done
 ok "Installed the 'orbit' command"
 
 # 3. Desktop integration ------------------------------------------------------
@@ -99,10 +106,10 @@ fi
 
 # 5. Start ---------------------------------------------------------------------
 pkill -f "$VENV/bin/orbit" 2>/dev/null || true
-(setsid "$BIN" >/dev/null 2>&1 &)
+(setsid "$BIN" service >/dev/null 2>&1 &)
 echo
 "$BIN" doctor || true
 echo
-ok "Orbit is ready. Drag any file, keep holding, and tap Shift."
+ok "Orbit is ready. Type 'orbit' in a new terminal, or drag any file and tap Shift."
 ((RELOGIN)) && warn "Log out and back in first so the new permission applies."
 exit 0

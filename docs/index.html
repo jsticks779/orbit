@@ -235,10 +235,10 @@ img, video { display: block; max-width: 100%; }
     <div class="wrap install">
       <div class="sec-head" style="margin:0">
         <span class="mono">Install</span>
-        <h2 class="h-l">Three lines.<br>One log in.</h2>
-        <p class="lede">For Ubuntu 24.04 and newer. The installer sets everything up, then log out and back in once.</p>
+        <h2 class="h-l">One line.<br>Then type orbit.</h2>
+        <p class="lede">For Ubuntu 24.04 and newer. Paste it in a terminal. When it finishes, log out and back in once so drag + Shift can work.</p>
       </div>
-      <div class="code"><button class="copy" data-copy>COPY</button><span class="c"># get Orbit</span><br><span class="p">$</span> git clone https://github.com/jsticks779/orbit.git<br><span class="p">$</span> cd orbit<br><span class="p">$</span> ./setup.sh</div>
+      <div class="code"><button class="copy" data-copy>COPY</button><span class="c"># install Orbit</span><br><span class="p">$</span> curl -fsSL https://jsticks779.github.io/orbit/install.sh | bash<br><br><span class="c"># then, in a new terminal</span><br><span class="p">$</span> orbit</div>
     </div>
   </section>
 
@@ -258,7 +258,7 @@ img, video { display: block; max-width: 100%; }
 <script>
 document.querySelectorAll("[data-copy]").forEach(function (btn) {
   btn.addEventListener("click", function () {
-    var text = "git clone https://github.com/jsticks779/orbit.git\ncd orbit\n./setup.sh";
+    var text = "curl -fsSL https://jsticks779.github.io/orbit/install.sh | bash";
     try {
       navigator.clipboard.writeText(text).then(function () {
         btn.textContent = "COPIED";

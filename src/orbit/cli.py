@@ -1,6 +1,7 @@
 """Command line entry point.
 
-    orbit                      start the background service (drag + Shift)
+    orbit                      make sure Orbit is running and show help
+    orbit service              run the background service (used by autostart)
     orbit ring [FILES...]      open the ring now (drop zone, or for FILES)
     orbit list FILES...        show which actions fit these files
     orbit run ACTION FILES...  run one action, e.g. `orbit run image.to_png a.jpg`
@@ -42,6 +43,37 @@ def cmd_run(args):
             print(out)
     except ActionError as e:
         sys.exit(f"orbit: {e}")
+
+
+BANNER = """
+  \033[1morbit\033[0m {version}   drag. shift. done.
+
+  {status}
+
+  \033[2mDrag any file, keep holding, and tap Shift.\033[0m
+
+  orbit ring FILE            open the card for a file
+  orbit list FILE            what can Orbit do with it?
+  orbit run ACTION FILE      do it right here, e.g. orbit run image.to_webp photo.jpg
+  orbit doctor               check your setup
+"""
+
+
+def cmd_welcome():
+    """Typed `orbit`: start the service in the background if needed, then say hello."""
+    import subprocess
+    running = subprocess.run(["gdbus", "call", "--session", "--dest", "org.freedesktop.DBus",
+                              "--object-path", "/org/freedesktop/DBus", "--method",
+                              "org.freedesktop.DBus.NameHasOwner", "io.github.jsticks779.Orbit"],
+                             capture_output=True, text=True).stdout
+    if "true" in running:
+        status = "\033[32m●\033[0m Orbit is running."
+    else:
+        subprocess.Popen([sys.argv[0], "service"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         start_new_session=True)
+        status = "\033[32m●\033[0m Orbit started."
+    print(BANNER.format(version=__version__, status=status))
+    return 0
 
 
 def cmd_doctor(_args):
@@ -97,6 +129,7 @@ def main(argv=None):
     run.add_argument("action")
     run.add_argument("files", nargs="+")
     sub.add_parser("doctor", help="check dependencies")
+    sub.add_parser("service", help="run the background service")
     args = parser.parse_args(argv)
 
     if args.cmd == "list":
@@ -105,6 +138,9 @@ def main(argv=None):
         return cmd_run(args)
     if args.cmd == "doctor":
         return cmd_doctor(args)
+
+    if args.cmd is None:
+        return cmd_welcome()
 
     import logging
     import os

@@ -52,17 +52,24 @@ These are real screenshots captured from Orbit (`tools/render_editors.py`).
 
 ## Install
 
-Ubuntu 24.04 or newer:
+Ubuntu 24.04 or newer. Paste this in a terminal:
 
 ```bash
-git clone https://github.com/jsticks779/orbit.git
-cd orbit
-./setup.sh
+curl -fsSL https://jsticks779.github.io/orbit/install.sh | bash
 ```
 
 Then **log out and back in once**. That turns on the drag + Shift permission and the small GNOME Shell
 helper that opens the card under your pointer (Wayland apps can't position their own windows).
-Orbit then starts with every session. Details and troubleshooting: [SETUP.md](SETUP.md).
+Orbit starts with every session, and typing `orbit` in a terminal shows its status and commands.
+
+<details><summary>Prefer to install from a clone?</summary>
+
+```bash
+git clone https://github.com/jsticks779/orbit.git && cd orbit && ./setup.sh
+```
+</details>
+
+Details and troubleshooting: [SETUP.md](SETUP.md).
 
 ## Other ways in
 

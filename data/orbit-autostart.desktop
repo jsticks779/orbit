@@ -2,7 +2,7 @@
 Type=Application
 Name=Orbit
 Comment=Drag a file and press Shift
-Exec=orbit
+Exec=orbit service
 Icon=io.github.jsticks779.Orbit
 NoDisplay=true
 X-GNOME-Autostart-enabled=true
