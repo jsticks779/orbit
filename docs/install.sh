@@ -42,5 +42,6 @@ else
   bash "$DEST/setup.sh"
 fi
 
-echo
-bold "Done. Open a new terminal and type:  orbit"
+# Finish with Orbit's own welcome (big ORBIT, status and commands).
+"$HOME/.local/bin/orbit" 2>/dev/null || true
+bold "  Installed. In a new terminal, type  orbit  any time to see this again."

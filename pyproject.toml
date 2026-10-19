@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "orbit"
-version = "0.1.3"
+version = "0.1.4"
 description = "Convert and edit files with a drag + Shift. A radial file tool for Linux."
 readme = "README.md"
 license = { text = "MIT" }

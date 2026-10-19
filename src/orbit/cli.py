@@ -45,12 +45,42 @@ def cmd_run(args):
         sys.exit(f"orbit: {e}")
 
 
+WORDMARK = [
+    " ██████╗ ██████╗ ██████╗ ██╗████████╗",
+    "██╔═══██╗██╔══██╗██╔══██╗██║╚══██╔══╝",
+    "██║   ██║██████╔╝██████╔╝██║   ██║   ",
+    "██║   ██║██╔══██╗██╔══██╗██║   ██║   ",
+    "╚██████╔╝██║  ██║██████╔╝██║   ██║   ",
+    " ╚═════╝ ╚═╝  ╚═╝╚═════╝ ╚═╝   ╚═╝   ",
+]
+
+
+def wordmark(color: bool) -> str:
+    """Big ORBIT: yellow blocks with a soft grey shadow (plain text without colour)."""
+    if not color:
+        return "\n".join("  " + line for line in WORDMARK)
+    out = []
+    for line in WORDMARK:
+        row = ""
+        for ch in line:
+            if ch == "█":
+                row += "\033[38;2;255;214;10m█"
+            elif ch == " ":
+                row += " "
+            else:
+                row += "\033[38;5;240m" + ch
+        out.append("  " + row + "\033[0m")
+    return "\n".join(out)
+
+
 BANNER = """
-  \033[1morbit\033[0m {version}   drag. shift. done.
+{logo}
+
+  {dim}drag. shift. done.{reset}  v{version}
 
   {status}
 
-  \033[2mDrag any file, keep holding, and tap Shift.\033[0m
+  {dim}Drag any file, keep holding, and tap Shift.{reset}
 
   orbit ring FILE            open the card for a file
   orbit list FILE            what can Orbit do with it?
@@ -66,13 +96,16 @@ def cmd_welcome():
                               "--object-path", "/org/freedesktop/DBus", "--method",
                               "org.freedesktop.DBus.NameHasOwner", "io.github.jsticks779.Orbit"],
                              capture_output=True, text=True).stdout
+    import os
+    color = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
+    green, dim, reset = ("\033[32m", "\033[2m", "\033[0m") if color else ("", "", "")
     if "true" in running:
-        status = "\033[32m●\033[0m Orbit is running."
+        status = f"{green}●{reset} Orbit is running."
     else:
         subprocess.Popen([sys.argv[0], "service"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                          start_new_session=True)
-        status = "\033[32m●\033[0m Orbit started."
-    print(BANNER.format(version=__version__, status=status))
+        status = f"{green}●{reset} Orbit started."
+    print(BANNER.format(logo=wordmark(color), version=__version__, status=status, dim=dim, reset=reset))
     return 0
 
 
