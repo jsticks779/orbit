@@ -28,3 +28,17 @@ button.orbit-swatch {
   border-radius: 999px;
   border: 1px solid alpha(currentColor, 0.15);
 }
+
+/* Home window */
+window.orbit-home .orbit-hero { font-weight: 900; font-size: 34px; letter-spacing: -1.2px; }
+window.orbit-home .orbit-section { font-family: "Geist Mono", monospace; font-weight: 600; font-size: 11px;
+  letter-spacing: 1px; opacity: 0.55; margin-top: 4px; }
+window.orbit-home .orbit-strong { font-weight: 600; }
+window.orbit-home .orbit-num { font-family: "Geist Mono", monospace; font-weight: 600; min-width: 22px;
+  min-height: 22px; border-radius: 999px; background: alpha(currentColor, 0.08); }
+window.orbit-home .orbit-status { font-weight: 600; font-size: 12px; padding: 4px 10px; border-radius: 999px; }
+window.orbit-home .orbit-status.on { color: #1d8a3a; background: alpha(#34C759, 0.14); }
+window.orbit-home .orbit-status.off { color: #8a6a00; background: alpha(#FFD60A, 0.25); }
+window.orbit-home .orbit-drop { padding: 26px; border-radius: 16px; border: 2px dashed alpha(currentColor, 0.18);
+  background: alpha(currentColor, 0.03); }
+window.orbit-home .orbit-drop.hover { border-color: #0A84FF; background: alpha(#0A84FF, 0.06); }

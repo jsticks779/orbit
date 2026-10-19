@@ -31,6 +31,9 @@ def _init():
 def play(name: str):
     if os.environ.get("ORBIT_SOUNDS", "1") == "0" or not _init():
         return
+    from ..core import settings
+    if not settings.load().get("sounds", True):
+        return
     now = time.monotonic()
     if now - _last.get(name, 0) < (0.07 if name == "hover" else 0.15):  # never machine-gun
         return

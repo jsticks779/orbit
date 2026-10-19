@@ -54,7 +54,10 @@ class OrbitApp(Adw.Application):
         args = cmd.get_arguments()[1:]
         if args and args[0] == "--ring":
             files = [Path(a) for a in args[1:]]
-            self.open_ring(files or None)  # without the service, quits when closed
+            if files:
+                self.open_ring(files)  # without the service, quits when closed
+            else:
+                self.open_home()
         else:
             self.start_service()
         return 0
@@ -87,6 +90,14 @@ class OrbitApp(Adw.Application):
         self.ring = RingWindow(self, files)
         self.ring.connect("close-request", self._ring_closed)
         self.ring.show_ring()
+
+    def open_home(self):
+        from .ui.home import HomeWindow
+        for w in self.get_windows():
+            if isinstance(w, HomeWindow):
+                w.present()
+                return
+        HomeWindow(self).present()
 
     def _ring_closed(self, win):
         if self.ring is win:
@@ -160,6 +171,8 @@ class OrbitApp(Adw.Application):
     def done(self, outs: list[Path]):
         if not outs:
             return
+        from .core import settings
+        settings.add_recent(outs)
         first = outs[0]
         title = f"Saved {first.name}" if len(outs) == 1 else f"Saved {len(outs)} files"
         self.notify(title, str(first.parent), show=first)

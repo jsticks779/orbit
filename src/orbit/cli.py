@@ -149,6 +149,7 @@ def _own_look():
     if (home / "gtk-4.0" / "gtk.css").exists():
         private = Path.home() / ".local" / "share" / "orbit" / "gtk-config"
         private.mkdir(parents=True, exist_ok=True)
+        os.environ["XDG_CONFIG_HOME_ORIG"] = str(home)  # Orbit's own settings stay in ~/.config/orbit
         os.environ["XDG_CONFIG_HOME"] = str(private)
 
 
