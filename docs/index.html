@@ -21,7 +21,7 @@
   --muted: #6b6b6b;
   --hair: #ececea;
   --paper: #f7f7f5;
-  --card-shadow: 0 0 0 1px rgba(0,0,0,.06), 0 34px 70px -30px rgba(0,0,0,.3);
+  --line: 1px solid #e2e2df;
   --gutter: 60px;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -33,7 +33,7 @@ img, video { display: block; max-width: 100%; }
 
 /* type */
 .mono { font-family: "Geist Mono", ui-monospace, monospace; font-weight: 600; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--graphite); }
-.tag { font-family: "Geist Mono", ui-monospace, monospace; font-weight: 600; font-size: 12px; letter-spacing: .08em; background: var(--sun); color: var(--ink); padding: 5px 9px; border-radius: 6px; display: inline-block; }
+.tag { font-family: "Geist Mono", ui-monospace, monospace; font-weight: 600; font-size: 12px; letter-spacing: .08em; background: var(--sun); color: var(--ink); padding: 5px 9px; border-radius: 3px; display: inline-block; }
 .h-xl { font-weight: 900; font-size: clamp(76px, 10vw, 148px); line-height: .86; letter-spacing: -.065em; }
 .h-l { font-weight: 800; font-size: clamp(44px, 5.4vw, 76px); line-height: .95; letter-spacing: -.05em; }
 .h-m { font-weight: 700; font-size: 22px; letter-spacing: -.02em; }
@@ -41,11 +41,11 @@ img, video { display: block; max-width: 100%; }
 .body { font-size: 16px; line-height: 24px; color: #3a3a38; }
 
 /* buttons */
-.pill { display: inline-flex; align-items: center; gap: 10px; background: var(--ink); color: #fff; font-weight: 600; font-size: 16px; padding: 14px 22px; border-radius: 999px; transition: transform .15s; }
-.pill:hover { transform: translateY(-1px); }
+.pill { display: inline-flex; align-items: center; gap: 10px; background: var(--ink); color: #fff; font-weight: 600; font-size: 16px; padding: 14px 22px; border-radius: 4px; }
+.pill:hover { background: #2a2a28; }
 .pill-sm { font-size: 14px; padding: 9px 16px; }
 .play { display: inline-flex; align-items: center; gap: 12px; font-weight: 600; font-size: 16px; }
-.play-ring { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; box-shadow: inset 0 0 0 1.5px var(--ink); }
+.play-ring { width: 44px; height: 44px; border-radius: 4px; display: grid; place-items: center; border: 1.5px solid var(--ink); }
 .link { font-weight: 500; font-size: 15px; }
 .link:hover { text-decoration: underline; text-underline-offset: 3px; }
 
@@ -62,7 +62,7 @@ img, video { display: block; max-width: 100%; }
 .ctas { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
 .stage { display: flex; justify-content: center; }
 .demo { width: min(600px, 100%); aspect-ratio: 600 / 640; }
-.card { background: #fff; border-radius: 22px; box-shadow: var(--card-shadow); }
+.card { background: #fff; border-radius: 6px; border: var(--line); }
 @keyframes bob { 0%,100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-10px) rotate(-2deg); } }
 
 /* sections */
@@ -80,22 +80,22 @@ img, video { display: block; max-width: 100%; }
 .kinds { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--hair); }
 .kind { padding: 28px 28px 32px 0; border-bottom: 1px solid var(--hair); display: flex; flex-direction: column; gap: 14px; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.fmt { font-family: "Geist Mono", monospace; font-weight: 600; font-size: 12px; letter-spacing: .04em; background: #fff; border: 1px solid var(--hair); padding: 5px 8px; border-radius: 6px; }
+.fmt { font-family: "Geist Mono", monospace; font-weight: 600; font-size: 12px; letter-spacing: .04em; background: #fff; border: 1px solid var(--hair); padding: 5px 8px; border-radius: 3px; }
 .fmt.tool { background: var(--paper); }
 
 .tools { display: grid; grid-template-columns: repeat(2, 1fr); gap: 56px 40px; align-items: start; }
 .tool { display: flex; flex-direction: column; gap: 18px; }
-.tool img { border-radius: 14px; box-shadow: 0 0 0 1px rgba(0,0,0,.08), 0 30px 60px -30px rgba(0,0,0,.35); }
+.tool img { border-radius: 6px; border: var(--line); }
 .tool figcaption { display: flex; flex-direction: column; gap: 6px; max-width: 460px; }
 
 .privacy { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; }
 .privacy div { display: flex; flex-direction: column; gap: 12px; border-top: 1px solid #2a2a28; padding-top: 22px; }
 
 .install { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center; }
-.code { position: relative; background: var(--ink); color: #f2f2f0; border-radius: 18px; padding: 26px 28px; font-family: "Geist Mono", monospace; font-size: 15px; line-height: 28px; overflow-x: auto; }
+.code { position: relative; background: var(--ink); color: #f2f2f0; border-radius: 6px; padding: 26px 28px; font-family: "Geist Mono", monospace; font-size: 15px; line-height: 28px; overflow-x: auto; }
 .code .c { color: #8a8a86; }
 .code .p { color: var(--sun); }
-.copy { position: absolute; right: 14px; top: 14px; font-family: "Geist Mono", monospace; font-size: 12px; font-weight: 600; letter-spacing: .06em; background: #232321; color: #fff; border: 0; border-radius: 8px; padding: 7px 10px; cursor: pointer; }
+.copy { position: absolute; right: 14px; top: 14px; font-family: "Geist Mono", monospace; font-size: 12px; font-weight: 600; letter-spacing: .06em; background: #232321; color: #fff; border: 0; border-radius: 3px; padding: 7px 10px; cursor: pointer; }
 .copy:hover { background: #333331; }
 
 .final { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 28px; padding: 140px 0 120px; }
@@ -162,8 +162,8 @@ img, video { display: block; max-width: 100%; }
         <div class="step">
           <img src="assets/shot-tools.png" alt="Orbit card showing tools" loading="lazy">
           <span class="mono">02</span>
-          <span class="h-m">Pick a bubble</span>
-          <p class="body">Bubbles grow as you get close, and a short line tells you what each one does. Tap Shift again for Tools.</p>
+          <span class="h-m">Pick a tile</span>
+          <p class="body">The tile under your pointer gets an outline, and a short line says what it does. Tap Shift again for Tools.</p>
         </div>
         <div class="step">
           <img src="assets/shot-done.png" alt="Orbit card showing a finished conversion" loading="lazy">

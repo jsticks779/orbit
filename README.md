@@ -16,13 +16,13 @@ Convert and edit any file on Ubuntu with one gesture.
 ## How it works
 
 Start dragging any file, keep holding, and tap <kbd>Shift</kbd>. A small card opens under your pointer
-with everything you can do to that file. Drop it on a bubble and the new file appears **right next to
+with everything you can do to that file. Drop it on a tile and the new file appears **right next to
 the original**. Your original is never touched.
 
-| 1. Drag and tap Shift | 2. Pick a bubble | 3. Drop. Done. |
+| 1. Drag and tap Shift | 2. Pick a tile | 3. Drop. Done. |
 |:---:|:---:|:---:|
 | <img src="docs/assets/shot-convert.png" width="260" alt="Convert page"> | <img src="docs/assets/shot-tools.png" width="260" alt="Tools page"> | <img src="docs/assets/shot-done.png" width="260" alt="Finished"> |
-| The card opens under your pointer. | Bubbles grow as you get close, and a short hint explains each one. Tap Shift again for Tools. | You see progress, hear a short chime, and the card closes itself. |
+| The card opens under your pointer. | The tile under your pointer gets an outline, and a short hint explains it. Tap Shift again for Tools. | You see progress, hear a short chime, and the card closes itself. |
 
 ## Formats
 
@@ -67,7 +67,7 @@ Orbit then starts with every session. Details and troubleshooting: [SETUP.md](SE
 ## Other ways in
 
 ```bash
-orbit ring photo.png              # open the card for a file and click a bubble
+orbit ring photo.png              # open the card for a file and click a tile
 orbit list report.pdf             # what can I do with this file?
 orbit run pdf.to_docx report.pdf  # do it from a terminal or script
 orbit doctor                      # check what's installed
