@@ -90,7 +90,18 @@ def cmd_doctor(_args):
     for tool, why in [("ffmpeg", "audio and video"), ("soffice", "office documents"), ("gs", "smaller PDFs")]:
         checks.append((bool(shutil.which(tool)), tool, why))
     readable = any(os.access(f"/dev/input/{d}", os.R_OK) for d in os.listdir("/dev/input") if d.startswith("event"))
-    checks.append((readable, "input access", "drag + Shift (run setup.sh, then log out and back in)"))
+    import grp
+    import pwd
+    try:
+        member = pwd.getpwuid(os.getuid()).pw_name in grp.getgrnam("input").gr_mem
+    except KeyError:
+        member = False
+    if readable:
+        checks.append((True, "input access", "drag + Shift"))
+    elif member:  # in the group; Orbit is started with it via `sg`, a re-login makes it permanent
+        checks.append((True, "input access", "drag + Shift (active for Orbit now)"))
+    else:
+        checks.append((False, "input access", "drag + Shift: run setup.sh"))
     for ok, name, why in checks:
         print(f"  {'✓' if ok else '✗'} {name:<14} {why}")
     return 0 if all(ok for ok, *_ in checks[:4]) else 1
