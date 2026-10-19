@@ -36,7 +36,7 @@ mv "$SRC" "$DEST"
 bold "Installing…"
 # setup.sh may ask for your password (system packages) and one yes/no question,
 # so give it the real terminal even though this script came through a pipe.
-if [[ -r /dev/tty ]]; then
+if (exec < /dev/tty) 2>/dev/null; then
   bash "$DEST/setup.sh" < /dev/tty
 else
   bash "$DEST/setup.sh"
